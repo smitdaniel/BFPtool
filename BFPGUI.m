@@ -30,14 +30,17 @@ function [ backdoorObj ] = BFPGUI( varargin )
 % UI settings
 verbose = true;     % sets UI to provide more (true) or less (false) messages
 selecting = false;  % indicates, if selection is under way and blocks other callbacks of selection
+selectWrng = 'Another selection process is currently running. Finish the former and try again.';
 
 % create backdoor object to modify hiddent parameters
 backdoorObj = BFPGUIbackdoor();
 
 % variables related to tracking
 pattern = [];       % pattern to be tracked over the video
+lastlistpat = [];   % the last pattern chosen for the list
 patternlist = [];
 bead = [];          % coordinates of bead to be tracked over the video
+lastlistbead = [];  % the last bead chosen for the list
 beadlist = [];
 beadradius = [8,18];    % limits on radius of the bead
 beadbuffer = 5;         % limit on grace period if bead cannot be detected (in frames)
@@ -167,7 +170,7 @@ hrmpatternbtn = uicontrol('Parent', hpatterns, 'Style', 'pushbutton', 'Units','n
             'Position', [0.5,0.5,0.5,0.15], 'String', 'Remove', 'Callback', {@rmpattern_callback});      
 hrectbutton = uicontrol('Parent',hpatterns,'Style','pushbutton',...
              'Units', 'normalized', 'Interruptible', 'off','BusyAction','cancel',...
-             'Position', [0,0.65,0.5,0.15], 'String', 'Select', 'Callback',{@getrect_callback});
+             'Position', [0,0.65,0.5,0.15], 'String', 'Select', 'Callback',{@getrect_callback,'list'});
 hpatcoortxt = uicontrol('Parent', hpatterns, 'Style', 'text' , 'String', {'[.,.;,]'},...
             'Units', 'normalized', 'Position', [0.5,0.65,0.5,0.15]);
 hminiaxes = axes('Parent',hpatterns, 'Units', 'normalized', 'Position', [0.05, 0.05, 0.9, 0.44],...
@@ -187,7 +190,7 @@ hbeadinilist = uicontrol('Parent', hbeadmethods, 'Style', 'popup', 'String', {'n
             'Units', 'normalized', 'Position', [0,0.3,1, 0.25], 'Callback', {@pickbead_callback});
 hpoitbtn = uicontrol('Parent', hbeadmethods, 'Style', 'pushbutton', 'Units', 'normalized',...
             'Position', [0,0.15,0.5,0.15], 'Interruptible', 'off','BusyAction','cancel', ...
-            'String', 'Select', 'Callback', {@getpoint_callback});
+            'String', 'Select', 'Callback', {@getpoint_callback, 'list'});
 hbeadcoortxt = uicontrol('Parent', hbeadmethods, 'Style', 'text' , 'String', {'[.,.;,]'},...
             'Units', 'normalized', 'Position', [0.5,0.15,0.5,0.15]);
 haddbeadbtn = uicontrol('Parent', hbeadmethods, 'Style', 'pushbutton', 'Units','normalized',...
@@ -288,7 +291,7 @@ hgetpattern  = uicontrol('Parent',hsetinterval, 'Style', 'pushbutton', 'String',
                       'Enable','off','Callback',{@getintpat_callback});
 hselectpat   = uicontrol('Parent',hsetinterval, 'Style', 'pushbutton', 'String', 'Select', ...
                       'Units','normalized','Position', [0.625,0.5,0.125,0.25],...
-                      'Enable','off','Callback',{@selectintpat_callback});                  
+                      'Enable','off','Callback',{@getrect_callback,'interval'});                  
                uicontrol('Parent',hsetinterval, 'Style', 'text', 'String', 'Selected bead:', ...
                       'TooltipString', 'Bead to be tracked over the interval',...
                       'Units','normalized','Position', [0,0.25,0.25,0.25],'HorizontalAlignment','left' );                  
@@ -300,7 +303,7 @@ hgetbead     = uicontrol('Parent',hsetinterval, 'Style', 'pushbutton', 'String',
                       'Enable','off','Callback',{@getintbead_callback});
 hselectbead  = uicontrol('Parent',hsetinterval, 'Style', 'pushbutton', 'String', 'Select', ...
                       'Units','normalized','Position', [0.625,0.25,0.125,0.25],...
-                      'Enable','off','Callback',{@selectintbead_callback});                  
+                      'Enable','off','Callback',{@getpoint_callback,'interval'});                  
                uicontrol('Parent',hsetinterval, 'Style', 'text', 'String', 'Pattern anchor:', ...
                       'TooltipString', 'Precise point on the pattern, whose position in time should be reported',...
                       'Units','normalized','Position', [0,0,0.25,0.25],'HorizontalAlignment','left' );
@@ -1528,74 +1531,6 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
         setframe(interval.frames(1));
     end
 
-    % select the bead while selecting the interval
-    function selectintbead_callback(source,~)
-
-        % abort if the selection process is already underway
-        if selecting
-            return;
-        else
-            selecting = true;
-        end
-        
-        if (interval.frames(1) == 0);           % in case of invalid initial frame input, set current frame
-            interval.frames(1) = vidObj.CurrentFrame;
-            interval.frames(2) = interval.frames(1);
-            hstartint.String = num2str(round(interval.frames(1)));
-            hendint.String = num2str(round(interval.frames(2)));
-        end;
-        if (interval.frames(2) == 0); % if the end of the interval is invalid, set one-frame interval
-            interval.frames(2) = interval.frames(1);
-            hendint.String = num2str(round(interval.frames(2)));
-        end; 
-        
-        BCfunction = makeConstrainToRectFcn('impoint',get(haxes,'XLim'),get(haxes,'YLim'));
-        setframe(interval.frames(1));   % make sure the bead is selected for the current interval
-        beadpoint = impoint(haxes,'PositionConstraintFcn',BCfunction);
-        source.String = 'Confirm';
-        source.Callback = 'uiresume(gcbf)';
-        uiwait(gcf);
-
-        try
-            interval.beadcoor = (beadpoint.getPosition);
-            choice = questdlg('Select bead contrast','Bead contrast','Bright','Dark','Dark');
-            switch choice
-                case 'Bright'
-                    interval.contrast = 'bright';
-                case 'Dark'
-                    interval.contrast = 'dark';
-            end
-            beadpoint.delete;
-            [coor,rad] = TrackBead(vidObj, interval.contrast, interval.beadcoor,...
-                             [ interval.frames(1), interval.frames(1) ] );
-            hcirc = viscircles(haxes,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot bead
-            choice = questdlg('Was the bead detected correctly?','Confirm selection','Accept','Reject','Accept');
-            switch choice
-                case 'Accept'
-                    hbeadint.String = strcat('[',num2str(round(interval.beadcoor(1))),',',num2str(round(interval.beadcoor(2))),...
-                                        ';',num2str(interval.frames(1)),']');
-                    tmpbeadframe = interval.frames(1);
-                case 'Reject'
-                    interval.beadcoor = [];
-                    interval.contrast = [];
-                    hbeadint.String = '[.,.;.]';
-            end
-            hcirc.delete;
-            hgetpattern.Enable = 'on';
-            hselectpat.Enable = 'on';
-        catch
-            warning(strjoin({'No point was properly selected. The detection was',...
-                'interrupted by another callback or user action. Please try to'...
-                'select the bead again.'}));
-            interval.beadcoor = [];     
-            beadpoint.delete;
-        end
-        
-        source.Callback = {@selectintbead_callback};
-        source.String = 'Select'; 
-        selecting = false;  % function ended; restore selection
-    end
-
     % saves the currently open bead for this interval to track
     function getintbead_callback(~,~)
         % check if there is a bead in the list to add
@@ -1621,6 +1556,7 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
                     return;
             end
         end
+        bead = beadlist(val);
         interval.contrast = beadlist(val).contrast;
         interval.beadcoor = beadlist(val).coor;
         tmpbeadframe = beadlist(val).frame;
@@ -1630,84 +1566,6 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
         hselectpat.Enable = 'on';
     end
 
-    % allows user to select rectangular ROI as an interval pattern
-    % directly, without saving into a pattern list
-    function selectintpat_callback(~,~)
-        
-        % if selection is underway, abort
-        if selecting;
-            warning('One selection process is already running');
-            return;
-        else
-            selecting = true;
-        end;
-        
-        BCRfunction = makeConstrainToRectFcn('imrect',haxes.XLim,haxes.YLim);
-        rectangle = imrect(haxes,'PositionConstraintFcn',BCRfunction);              % interactive ROI selection
-        hselectpat.String = 'Confirm';         % update UI to confirm selection
-        hselectpat.Callback = 'uiresume(gcbf)';
-        uiwait(gcf);                            % wait for the confirmation by user
-        
-        try
-            doublecoor = (rectangle.getPosition);   % get coordinates of the ROI
-            coor = round(doublecoor);
-            tmppatframe = vidObj.CurrentFrame;        % framenumber of the frame
-            roi = [ max(coor(2),1), min(coor(2)+coor(4),vidObj.Height);...          % ROI in the image
-                    max(coor(1),1), min(coor(1)+coor(3),vidObj.Width) ];            % construct coors of ROI
-            interval.pattern = frame.cdata(roi(1,1):roi(1,2),roi(2,1):roi(2,2),:);  % copy the selected image  
-            interval.patcoor = [doublecoor(1), doublecoor(2)];      % save the upper left corner rectangle
-            interval.reference = getreference(tmppatframe);
-
-            rectangle.delete;                          % remove used rectangle
-            hrefframe.String = interval.reference;
-            hselectpat.String = 'Select';              % restore the UI
-            hselectpat.Callback = {@selectintpat_callback};
-            hpatternint.String = strcat('[',num2str(round(interval.patcoor(1))),',',num2str(round(interval.patcoor(2))),...
-                                        ';',num2str(tmppatframe),']');
-            choice = questdlg(strjoin({'Please, select the anchor on the pattern, keep default selection.',...
-                             'For more information, choose ''Info'' button'}),'Anchor selection',...
-                             'Select', 'Default', 'Info', 'Default');
-
-            if strcmp(choice,'Info')
-                choice = questdlg(strjoin({'The anchor represents a coordinate on the pattern, which',...
-                        'will be reported by the tracking method over time. It determines the point on the',...
-                        'pipette, which will be used to calculate the extension of the red blood cell.',...
-                        'You can select the point Yourself, or let the choice up to algorithm.'}),...
-                        'Anchor selection - details', 'Select', 'Default', 'Default');
-            end
-
-            switch choice
-                case 'Select'
-                    [hf,hax] = showintpattern_callback();
-                    BCfunction = makeConstrainToRectFcn('impoint',get(hax,'XLim'),get(hax,'YLim'));
-                    anchorpoint = impoint(hax, 'PositionConstraintFcn', BCfunction);
-                    hselectpat.String = 'Accept';
-                    hselectpat.ForegroundColor = 'red';
-                    hselectpat.Callback = 'uiresume(gcbf)';
-                    uiwait(gcbf);
-                    interval.patsubcoor = anchorpoint.getPosition;
-                    anchorpoint.delete;
-                    set(hselectpat, 'String', 'Select', 'ForegroundColor', 'black', 'Callback',  {@selectintpat_callback});
-                    hf.delete;
-                case 'Default'
-                    interval.patsubcoor = round(0.5*[size(interval.pattern,2),size(interval.pattern,1)]);
-            end
-            hpatsubcoor.String = strcat('[',num2str(round(interval.patsubcoor(1))),','...
-                                ,num2str(round(interval.patsubcoor(2))),']');        
-
-            hgetpatsubcoor.Enable = 'on';
-            hshowpattern.Enable = 'on';
-            haddinterval.Enable = 'on';
-            hgetrefframe.Enable = 'on';
-        catch
-            rectangle.delete;
-            hselectpat.String = 'Select';
-            hselectpat.Callback = {@selectintpat_callback};
-            
-        end
-        
-        selecting = false;
-    end
 
     % saves the currently open pattern for this interval to track
     function getintpat_callback(~,~)
@@ -1718,6 +1576,7 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
         end
         
         val = hpatternlist.Value;
+        pattern = patternlist(val);         % set last added pattern 
         tmppatframe = patternlist(val).frame;
         interval.pattern = patternlist(val).cdata;
         interval.patcoor = patternlist(val).coor;
@@ -1934,10 +1793,14 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
 
     % add the selected bead coordinate to list
     function addbead_callback(~,~)
-        beadlist = strucopy(beadlist,bead);     % push back bead to the beadlist
+        if isempty(lastlistbead);
+            warning('No bead to add');
+            return;
+        end;
+        beadlist = strucopy(beadlist,lastlistbead);     % push back bead to the beadlist
         ind = numel(beadlist);
-        hbeadinilist.String(ind) = {strcat('[',num2str(round(bead.coor(1))),',',num2str(round(bead.coor(2))),';',...
-                                    num2str(bead.frame),';',bead.contrast,']')};
+        hbeadinilist.String(ind) = {strcat('[',num2str(round(lastlistbead.coor(1))),',',num2str(round(lastlistbead.coor(2))),';',...
+                                    num2str(lastlistbead.frame),';',lastlistbead.contrast,']')};
         hbeadinilist.Value = ind;
     end
 
@@ -1969,10 +1832,14 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
 
     % button adds current pattern to the pattern list
     function addpattern_callback(~,~)
-        patternlist = strucopy(patternlist,pattern);    % adds new pattern to the end of the list
+        if isempty(lastlistpat);
+            warning('No pattern to add');
+            return;
+        end;
+        patternlist = strucopy(patternlist,lastlistpat);    % adds new pattern to the end of the list
         ind = numel(patternlist);
-        hpatternlist.String(ind) = {strcat('[',num2str(round(pattern.coor(1))),',',num2str(round(pattern.coor(2))),';',...
-                                    num2str(pattern.frame),']')};
+        hpatternlist.String(ind) = {strcat('[',num2str(round(lastlistpat.coor(1))),',',num2str(round(lastlistpat.coor(2))),';',...
+                                    num2str(lastlistpat.frame),']')};
         hpatternlist.Value = ind;
     end
 
@@ -2003,91 +1870,96 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
     end
 
     % select the centre of the bead as a seed for tracking
-    function getpoint_callback(source,~)
-        BCfunction = makeConstrainToRectFcn('impoint',get(haxes,'XLim'),get(haxes,'YLim'));
-        beadpoint = impoint(haxes,'PositionConstraintFcn',BCfunction);
-        source.String = 'Confirm';
-        source.Callback = 'uiresume(gcbf)';
-        uiwait(gcf);
+    function getpoint_callback(source,~,srctag)
         
-        bead.coor = (beadpoint.getPosition);
-        bead.frame = round(vidObj.CurrentFrame);
-        choice = questdlg('Select bead contrast','Bead contrast','Bright','Dark','Dark');
-        switch choice
-            case 'Bright'
-                bead.contrast = 'bright';
-            case 'Dark'
-                bead.contrast = 'dark';
+        % check if there's no other selection under way
+        if selecting
+            warning(selectWrng);
+            return;
+        else
+            selecting = true;
         end
-        beadpoint.delete;
-        [coor,rad] = TrackBead(vidObj, bead.contrast, bead.coor,...
-                         [ bead.frame, bead.frame ] );
-        hcirc = viscircles(haxes,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot bead
-        choice = questdlg('Was the bead detected correctly?','Confirm selection','Accept','Reject','Accept');
-        switch choice
-            case 'Accept'
+            
+        [bead,pass] = getBead(source,srctag);  % call method to detect bead
+        
+        % if detection fails (reject or error), old 'bead' value is returned
+        % if old value is empty, stop here, do not change anything
+        if isempty(bead) || ~pass; 
+            selecting = false;
+            return; 
+        end;  
+            
+        % only if meaningful bead selection was returned, continue
+        switch srctag
+            case 'list'     % call source is list
+                lastlistbead = bead;
                 hbeadcoortxt.String = strcat('[',num2str(round(bead.coor(1))),',',num2str(round(bead.coor(2))),...
                                         ';',num2str(bead.frame),']');
-            case 'Reject'
-                bead.coor = [];
-                bead.contrast = [];
-                bead.frame = [];
-                hbeadcoortxt.String = '[.,.;.]';
+            case 'interval' % call source is direct interval bead detection
+                if (interval.frames(1) ~= bead.frame)
+                    warning(strjoin({'Initial frame of current tracking interval was changed',...
+                            'to the frame of bead selection. If You wish to preserve Your interval,',...
+                            'reselect the bead in the appropriate frame.'}));
+                    interval.frames(1) = bead.frame;
+                    hstartint.String = num2str(round(interval.frames(1)));
+                end;
+                if (interval.frames(2) == 0 || interval.frames(2) < interval.frames(1))
+                    warning(strjoin({'Final frame of current tracking interval was invalid',...
+                        'and was changed. The final frame must not precede the initial.'}));
+                    interval.frames(2) = interval.frames(1);
+                    hendint.String = num2str(round(interval.frames(2)));
+                end;
+                interval.beadcoor = bead.coor;
+                interval.contrast = bead.contrast;
+                hbeadint.String = strcat('[',num2str(round(interval.beadcoor(1))),',',num2str(round(interval.beadcoor(2))),...
+                                        ';',num2str(interval.frames(1)),']');
+                tmpbeadframe = interval.frames(1);
+                hgetpattern.Enable = 'on';
+                hselectpat.Enable = 'on';
         end
-        hcirc.delete;
-        source.Callback = {@getpoint_callback};
-        source.String = 'Select';  
+       
+        selecting = false;  % release detection lock
+        
     end
         
     % allows user to select rectangular ROI as a pattern file
-    function getrect_callback(~,~)
-        BCRfunction = makeConstrainToRectFcn('imrect',haxes.XLim,haxes.YLim);
-        rectangle = imrect(haxes,'PositionConstraintFcn',BCRfunction);              % interactive ROI selection
-        hrectbutton.String = 'Confirm';         % update UI to confirm selection
-        hrectbutton.Callback = 'uiresume(gcbf)';
-        uiwait(gcf);                            % wait for the confirmation by user
-        doublecoor = (rectangle.getPosition);   % get coordinates of the ROI
-        coor = round(doublecoor);
-        pattern = struct('cdata', zeros(coor(4),coor(3), 'uint16'), 'colormap', [],...
-                    'coor', zeros(1,2), 'anchor', zeros(1,2), 'frame', 0 );     % preallocate
-        roi = [ max(coor(2),1), min(coor(2)+coor(4),vidObj.Height);...          % ROI in the image
-                max(coor(1),1), min(coor(1)+coor(3),vidObj.Width) ];            % construct coors of ROI
-        pattern.cdata = frame.cdata(roi(1,1):roi(1,2),roi(2,1):roi(2,2),:);     % copy the selected image
-        pattern.coor  = [doublecoor(1), doublecoor(2)]; % save the upper left corner rectangle
-        pattern.frame = vidObj.CurrentFrame;        % framenumber of the frame
-        rectangle.delete;                           % remove used rectangle
-        setpattern(pattern);                        % display pattern in special axes
-        hrectbutton.String = 'Select';              % restore the UI
-        hrectbutton.Callback = {@getrect_callback};
-        hpatcoortxt.String = strcat( '[',num2str(round(pattern.coor(1))),',',num2str(round(pattern.coor(2))),';',...
-            num2str(pattern.frame),']');
-        choice = questdlg(strjoin({'Please, select the anchor on the pattern, keep default selection.',...
-                         'For more information, choose ''Info'' button'}),'Anchor selection',...
-                         'Select', 'Default', 'Info', 'Default');
+    function getrect_callback(source,~,srctag)
         
-        if strcmp(choice,'Info')
-            choice = questdlg(strjoin({'The anchor represents a coordinate on the pattern, which',...
-                    'will be reported by the tracking method over time. It determines the point on the',...
-                    'pipette, which will be used to calculate the extension of the red blood cell.',...
-                    'You can select the point Yourself, or let the choice up to algorithm.',...
-                    'But as of now, it will only choose centre of the selected pattern.'}),...
-                    'Anchor selection - details', 'Select', 'Default', 'Default');
+        % check if no other selection process is running
+        if selecting
+            warning(selectWrng);
+            return;
+        else
+            selecting = true;
         end
         
-        switch choice
-            case 'Select'
-                BCfunction = makeConstrainToRectFcn('impoint',get(hminiaxes,'XLim'),get(hminiaxes,'YLim'));
-                anchorpoint = impoint(hminiaxes, 'PositionConstraintFcn', BCfunction);
-                hrectbutton.String = 'Accept';
-                hrectbutton.ForegroundColor = 'red';
-                hrectbutton.Callback = 'uiresume(gcbf)';
-                uiwait(gcf);
-                pattern.anchor = anchorpoint.getPosition;
-                anchorpoint.delete;
-                set(hrectbutton, 'String', 'Select', 'ForegroundColor', 'black', 'Callback',  {@getrect_callback});
-            case 'Default'
-                pattern.anchor = round(0.5*[size(pattern.cdata,2),size(pattern.cdata,1)]);
+        [pattern,pass] = getPattern( source, srctag);
+        
+        if isempty(pattern) || ~pass; 
+            selecting = false;
+            return; 
+        end;  
+        
+        switch srctag
+            case 'list'
+                lastlistpat = pattern;
+                hpatcoortxt.String = strcat( '[',num2str(round(pattern.coor(1))),',',num2str(round(pattern.coor(2))),';',...
+                num2str(pattern.frame),']');
+                setpattern(pattern);
+            case 'interval'
+                interval.pattern = pattern.cdata;
+                interval.patcoor = pattern.coor;
+                tmppatframe = pattern.frame;
+                interval.reference = getreference(pattern.frame);
+                interval.patsubcoor = pattern.anchor;
+                hrefframe.String = interval.reference;
+                hpatternint.String = strcat('[',num2str(round(interval.patcoor(1))),',',num2str(round(interval.patcoor(2))),...
+                                        ';',num2str(tmppatframe),']');
+                hpatsubcoor.String = strcat('[',num2str(round(interval.patsubcoor(1))),','...
+                                ,num2str(round(interval.patsubcoor(2))),']');
         end
+        
+        selecting = false;
                 
     end
 
@@ -2098,7 +1970,7 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
 
     % browse button to chose the file
     function browsevideo_callback(~,~)
-        [filename, pathname] = uigetfile({'*.avi;*.mp4;*.tiff;*tif','Video Files (*.avi,*.mp4,*.fiff)'},...
+        [filename, pathname] = uigetfile({'*.avi;*.mp4;*.tiff;*tif','Video Files (*.avi,*.mp4,*.tiff)'},...
                                 'Select a video file',videopath);
         if ~isequal(filename, 0)     % test validity of selected file; returned 0 if canceled
             videopath = strcat(pathname,filename);
@@ -2272,6 +2144,148 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
     end
 % ==================================================================
 %   ======================== HELPER FUNCTIONS ======================
+   
+    % detect and return pipette pattern
+    function [ patinfo,pass ] = getPattern( source, tag )
+        
+        patinfo = struct('coor',[],'frame',[],'reference',[], 'cdata', [], 'anchor', []);
+        BCRfunction = makeConstrainToRectFcn('imrect',haxes.XLim,haxes.YLim);
+        rectangle = imrect(haxes,'PositionConstraintFcn',BCRfunction);              % interactive ROI selection
+        source.String = 'Confirm';         % update UI to confirm selection
+        source.Callback = 'uiresume(gcbf)';
+        uiwait(gcf);   
+        
+        try 
+            dcoor = rectangle.getPosition;  % vector of 4 coordinates; doubles
+            icoor = round(dcoor);
+            roi = [ max(icoor(2),1), min(icoor(2)+icoor(4),vidObj.Height);...       % ROI in the image
+                    max(icoor(1),1), min(icoor(1)+icoor(3),vidObj.Width) ];         % construct coors of ROI
+            patinfo.cdata = frame.cdata(roi(1,1):roi(1,2),roi(2,1):roi(2,2),:);   % copy the selected image  
+            patinfo.coor = [ dcoor(1), dcoor(2) ];          % save rect upper left corner
+            patinfo.frame = round(vidObj.CurrentFrame);     % set reference distance for the pattern
+            
+            rectangle.delete;
+            
+            choice = questdlg(strjoin({'Please, select the anchor on the pattern, keep default selection.',...
+                             'For more information, choose ''Info'' button'}),'Anchor selection',...
+                             'Select', 'Default', 'Info', 'Default');
+                         
+            if strcmp(choice,'Info')
+                choice = questdlg(strjoin({'The anchor represents a coordinate on the pattern, which',...
+                        'will be reported by the tracking method over time. It determines the point on the',...
+                        'pipette, which will be used to calculate the extension of the red blood cell.',...
+                        'You can select the point Yourself, or let the choice up to algorithm.'}),...
+                        'Anchor selection - details', 'Select', 'Default', 'Default');
+            end
+            
+            switch choice
+                case 'Select'
+
+                    % set depending on the source call
+                    if strcmp(tag,'interval')
+                        interval.pattern = patinfo.cdata;
+                        [hf,hax] = showintpattern_callback();
+                    else
+                        hax = hminiaxes;
+                        imagesc(patinfo.cdata, 'Parent', hax);  % display the cut in the special window
+                        axis(hax, 'image','off');
+                    end
+                    
+                    BCfunction = makeConstrainToRectFcn('impoint',get(hax,'XLim'),get(hax,'YLim'));
+                    anchorpoint = impoint(hax, 'PositionConstraintFcn', BCfunction);
+                    source.String = 'Accept';
+                    source.ForegroundColor = 'red';
+                    source.Callback = 'uiresume(gcbf)';
+                    uiwait(gcbf);
+                    try
+                        patinfo.anchor = anchorpoint.getPosition;                        
+                    catch
+                        warning(strjoin({'An error occured during anchor selection callback,',...
+                        'it was probably interrupted by another function or action.'}));
+                        warndlg({'Selection function failed. The anchor point value (reference) has been set to default';...
+                            'It can still be modified in Interval selection window.'},'Anchor selection failed','replace');
+                        patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
+                    end
+                    set(source, 'String', 'Select', 'ForegroundColor', 'black', 'Callback',  {@getrect_callback,tag});
+                    anchorpoint.delete;
+                    if exist('hf','var'); hf.delete; end;
+                case 'Default'
+                    patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
+            end
+
+            hgetpatsubcoor.Enable = 'on';
+            hshowpattern.Enable = 'on';
+            haddinterval.Enable = 'on';
+            hgetrefframe.Enable = 'on';
+            pass = true;
+            
+        catch
+            warning(strjoin({'An error occured during pattern selection callback,',...
+                'it was probably interrupted by another function or action.',...
+                'Please try again, without any intermittent action.'}));
+            rectangle.delete;
+            patinfo = pattern;
+            pass = false;
+            
+        end
+        
+        source.String = 'Select';
+        source.Callback = {@getrect_callback, tag};
+        
+    end
+
+
+    % detect and return bead information
+    function [ beadinfo,pass ] = getBead( source,tag )
+        
+        beadinfo = struct('coor',[],'frame',[],'contrast',[]);
+        % intial section, set boundary, select point, change UI, wait for
+        % confirmation of the selection
+        BCfunction = makeConstrainToRectFcn('impoint',get(haxes,'XLim'),get(haxes,'YLim'));
+        beadpoint = impoint(haxes,'PositionConstraintFcn',BCfunction);
+        source.String = 'Confirm';
+        source.Callback = 'uiresume(gcbf)';
+        uiwait(gcf);
+        
+        try
+            beadinfo.coor = beadpoint.getPosition;
+            beadinfo.frame= round(vidObj.CurrentFrame);
+            choice = questdlg('Select bead contrast','Bead contrast','Bright','Dark','Dark');
+            switch choice
+                case 'Bright'
+                    beadinfo.contrast = 'bright';
+                case 'Dark'
+                    beadinfo.contrast = 'dark';
+            end;
+            beadpoint.delete;
+            [coor,rad] = TrackBead(vidObj, beadinfo.contrast, beadinfo.coor,...
+                         [ beadinfo.frame, beadinfo.frame ] );  % try to detect the bead in the frame
+            hcirc = viscircles(haxes,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot the detected bead
+            choice = questdlg('Was the bead detected correctly?','Confirm selection','Accept','Reject','Accept');
+            switch choice
+                case 'Accept'   % precise the coordinate
+                    beadinfo.coor = coor;
+                    pass = true;
+                case 'Reject'
+                    beadinfo = bead;
+                    pass = false;
+            end;
+            hcirc.delete;
+        catch
+            warning(strjoin({'An error occured during bead selection callback,',...
+                'it was probably interrupted by another function or action.',...
+                'Please try again, without any intermittent action.'}));
+            beadpoint.delete;
+            beadinfo = bead;
+            pass=false;
+        end
+        
+        source.String = 'Select';
+        source.Callback = {@getpoint_callback,tag};                     
+                     
+    end
+
+
     % selects pattern
     function [] = setpattern(pattern_in)
        pattern = pattern_in;
