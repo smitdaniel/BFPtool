@@ -127,9 +127,22 @@ classdef vidWrap < handle
                     if(mod(frm,100)==0); disp(strcat('Frames processed:', num2str(frm),'/',num2str(obj.Frames))); end;
                 end
 
-                % normalize
-                obj.Contrast = obj.Contrast/max(obj.Contrast);
-                obj.GrayLvl  = obj.GrayLvl/max(obj.GrayLvl);
+                % normalize; values for contrast and mean-gray are only
+                % positive; if they're 0, report suspicion even
+                maxContrast = max(obj.Contrast);
+                maxGrayLvl  = max(obj.GrayLvl);
+                
+                if maxContrast ~= 0
+                    obj.Contrast = obj.Contrast/max(obj.Contrast);
+                else
+                    warning('The values of contrast measure are suspicious (max=0). Please double check your video.');
+                end;
+                
+                if maxGrayLvl ~= 0
+                    obj.GrayLvl  = obj.GrayLvl/max(obj.GrayLvl);
+                else
+                    warning('The values of mean gray level are suspicions (max=0). Please double check your video.')
+                end
 
                 obj.readFrame(oldFrame);    % reset the original image
             end;

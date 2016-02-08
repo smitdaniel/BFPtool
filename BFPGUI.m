@@ -374,10 +374,13 @@ hvidformat = uicontrol('Parent', hvidinfo, 'Style', 'text', 'Units', 'normalized
 hcalc =     uipanel('Parent', hfig, 'Title', 'Tracking', 'Units', 'normalized',...
                 'Position', [0.76,0.05,0.1,0.5]);
 hupdate      =   uicontrol('Parent', hcalc, 'Style','pushbutton','String', 'Update', 'Units', 'normalized',...
+                'TooltipString','Commit modifications of tracking settings',...
                 'Position', [0, 0.85, 0.5, 0.15], 'Enable', 'off', 'Callback', {@update_callback});
 hruntrack    =   uicontrol('Parent', hcalc, 'Style', 'pushbutton', 'String', 'Track', 'Units', 'normalized',...
+                'TooltipString','Start tracking procedure for commited intervals',...
                 'Position', [0.5, 0.85,0.5,0.15], 'Enable', 'off','Callback', {@runtrack_callback});
 hrunforce    =   uicontrol('Parent', hcalc, 'Style', 'pushbutton', 'String', '<HTML><center>Get<br>Force</HTML>', 'Units', 'normalized',...
+                'TooltipString','Calculate stiffness and force time profile',...
                 'Position', [0.5, 0.7,0.5,0.15], 'Enable', 'off','Callback', {@runforce_callback});            
 hgraphplot   =   uicontrol('Parent', hcalc, 'Style', 'pushbutton', 'String', 'Plot', 'Units', 'normalized',...
                 'Position', [0,0.5, 0.5, 0.15], 'Enable', 'off', 'Callback', {@graphplot_callback});
@@ -1198,6 +1201,15 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
 
     % gets parameters for calculation, calculates (&shows) 'k', gets force
     function runforce_callback(~,~)
+        if verbose; 
+            choice = questdlg(strjoin({'This action runs force calculation. The force, however,',...
+                'must be calibrated (i.e. stiffness ''k'' calculated) using experiment settings dependent parameters',...
+                'adjustable in ''Experimental data'' panel. Initially, it contains only order of magnitude',...
+                'values, to give an idea of force time dependence. If You want to have results properly',...
+                'calibrated for Your experiment, please review these values before the calculation.'}),...
+                'Parameters for force calculation', 'Review', 'Proceed', 'Review');
+            if strcmp(choice,'Review'); return; end;
+        end;
         persistent hanot;
         if ~isempty(hanot);hanot.delete;end;
         BFPobj.getParameters(RBCradius, CAradius, PIPradius, pressure);
@@ -2009,7 +2021,7 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
 
     % plot the contrast progress of the video
     function getcontrast_callback(~,~)
-        % if video is long
+        % if video is long, issue notice
         if vidObj.Frames > 1000 && verbose && numel(vidObj.Contrast) ~= vidObj.Frames
             choice = questdlg(strjoin({'The video consists of more than 1000 frames. Depending on Your system,',...
                 'the analysis can take up to several minutes. Progress is reported in the Matlab command window.',...
@@ -2022,10 +2034,11 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
             end
         end
         [ contrast, ~ ] = vidObj.getContrast;    % calculates and saves in video object, if not yet calculated
-        if(toPlot~=1)
-            lowplot = 1;                % initial frame
-            highplot = vidObj.Frames;   % final frame
-        end
+        
+        lowplot = 1;                % initial frame
+        highplot = vidObj.Frames;   % final frame
+        fitInt = [lowplot, 0; highplot, 0];  % set global fit interval
+        
         cla(hgraph);                % clear current graph
         hold(hgraph,'on');
         hconplot  = plot(hgraph,lowplot:highplot,contrast(lowplot:highplot),'r','HitTest','off');
@@ -2037,7 +2050,9 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
         set( hlowplot,  'Enable','on', 'String', num2str(lowplot)  );
         set( hhighplot, 'Enable','on', 'String', num2str(highplot) );        
 %        legend(hgraph,'contrast','mean gray');
-        legend(hgraph,'contrast');
+        cl = legend(hgraph,'\fontsize{12} contrast');
+        cl.Box = 'off';
+        title(hgraph,{'\fontsize{15} Contrast measure';'[standard deviation of each frame]'},'Color','r');
         
         % find plateaux and report 'safe' and 'unsafe' intervals
         % these parameters can be backdoored;
@@ -2124,18 +2139,22 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
 
     % open video and set its parameters where necessary
     function openvideo_callback(~,~)
-        vidObj = vidWrap(videopath);
-        frame = struct('cdata', zeros(vidObj.Height,vidObj.Width, 'uint16'), 'colormap', []);
-        hmoviebar.Enable = 'on';
-        hmoviebar.Min = 1;
-        hmoviebar.Max = vidObj.Frames;
-        hmoviebar.Value = vidObj.CurrentFrame;
-        hmoviebar.SliderStep = [ 1/vidObj.Frames, 0.1 ];
-        setframe(1);
-        setvidinfo();
-        setvidinterval();
-        set([hdispframe,hstartint,hendint,hshowframe,hrefframe],'Enable','on');
-        set([hplaybutton,hrewindbtn,hffwdbutton,hcontrast],'Enable','on');
+        if exist(videopath,'file') ~= 2;    % i.e. path is not a path to a file
+            warndlg('Path is incorrect or the file doesn''t exist','File inaccessible','replace');
+        else
+            vidObj = vidWrap(videopath);
+            frame = struct('cdata', zeros(vidObj.Height,vidObj.Width, 'uint16'), 'colormap', []);
+            hmoviebar.Enable = 'on';
+            hmoviebar.Min = 1;
+            hmoviebar.Max = vidObj.Frames;
+            hmoviebar.Value = vidObj.CurrentFrame;
+            hmoviebar.SliderStep = [ 1/vidObj.Frames, 0.1 ];
+            setframe(1);
+            setvidinfo();
+            setvidinterval();
+            set([hdispframe,hstartint,hendint,hshowframe,hrefframe],'Enable','on');
+            set([hplaybutton,hrewindbtn,hffwdbutton,hcontrast],'Enable','on');
+        end
     end
 
     % set position in the video
@@ -2234,7 +2253,6 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
         
     end
 
-
     % detect and return bead information
     function [ beadinfo,pass ] = getBead( source,tag )
         
@@ -2247,10 +2265,11 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
         source.Callback = 'uiresume(gcbf)';
         uiwait(gcf);
         
-        try
+         try
             beadinfo.coor = beadpoint.getPosition;
             beadinfo.frame= round(vidObj.CurrentFrame);
-            choice = questdlg('Select bead contrast','Bead contrast','Bright','Dark','Dark');
+            choice = questdlg('Select bead contrast. For a bead darker than background, select ''Dark'', and visa versa.',...
+                'Bead contrast','Bright','Dark','Dark');
             switch choice
                 case 'Bright'
                     beadinfo.contrast = 'bright';
@@ -2258,8 +2277,25 @@ hhidedet = uicontrol('Parent',hio,'Style','togglebutton','Min',0, 'Max',1,'Value
                     beadinfo.contrast = 'dark';
             end;
             beadpoint.delete;
-            [coor,rad] = TrackBead(vidObj, beadinfo.contrast, beadinfo.coor,...
-                         [ beadinfo.frame, beadinfo.frame ] );  % try to detect the bead in the frame
+            [coor,rad,metric,~] = TrackBead(vidObj, beadinfo.contrast, beadinfo.coor,...
+                         [ beadinfo.frame, beadinfo.frame ], 'retries', 1 );  % try to detect the bead in the frame
+
+            if rad == 0;    % stop if nothing is detected
+                warndlg(strjoin({'No bead was detected in the given vicinity for',beadinfo.contrast,'contrast.',...
+                    'Please repeat Your selection, placing the search point within the desired bead',...
+                    'and choosing the appropriate contrast. Search will now abort.'}),'No bead detected','replace');
+                pass = false;
+                source.String = 'Select';
+                source.Callback = {@getpoint_callback,tag};
+                return;     % kill the procedure
+            end
+                
+            if metric < beadmetricthresh;   % warn for weak detection; use glab metric thresh
+                    warning(strjoin({'The bead metric is only',num2str(metric),...
+                    'which is below the threshold',num2str(beadmetricthresh),...
+                    'and detection failures can occur.'}));
+            end;
+                
             hcirc = viscircles(haxes,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot the detected bead
             choice = questdlg('Was the bead detected correctly?','Confirm selection','Accept','Reject','Accept');
             switch choice

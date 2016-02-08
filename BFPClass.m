@@ -136,7 +136,6 @@ classdef BFPClass < handle
                                    (obj.intervallist(int).frames(2)-obj.intervallist(int).frames(1)+1);
             end
             obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','3D');          % plot the tracking data
-            legend(hplot,'pipette','bead');
             obj.tracked = true;             % set 'tracked' flag
             obj.generateReport();
         end
@@ -202,7 +201,10 @@ classdef BFPClass < handle
                 
                 if strcmp(style,'F')
                     plot( hplot, ffrm:lfrm, obj.force(int).values(start:stop),'g','HitTest','off' );
-                    legend(hplot,'force');
+                    lh = legend(hplot,'force');
+                    th = title(hplot, 'Force [pN]','Color','green');
+                    xlabel(hplot, 'time [frames]', 'FontSize',12);
+                    ylabel(hplot, 'Force [pN]', 'FontSize',12);
                 else
                     if pip && numel(obj.pipPositions) ~= 0;
                         if strcmp(style,'3D')
@@ -229,13 +231,31 @@ classdef BFPClass < handle
                     end
                     % plot appropriate legend
                     if pip && bead;
-                        legend(hplot, 'pipette', 'bead');
+                        lh = legend(hplot, 'pipette', 'bead');
                     elseif pip;
-                        legend(hplot, 'pipette');
+                        lh = legend(hplot, 'pipette');
                     elseif bead
-                        legend(hplot, 'bead');
+                        lh = legend(hplot, 'bead');
                     end
                 end
+                lh.Box = 'off';
+                lh.FontSize = 12;
+                switch(style)
+                    case '3D'
+                        th = title(hplot, {'Tracks in time';'[third coordinate is temporal]'},'Color','blue');
+                        xlabel(hplot,'x-coordinate [\mu m]', 'FontSize',12);
+                        ylabel(hplot,'y-coordinate [\mu m]', 'FontSize',12);
+                        zlabel(hplot,'time [frames]','FontSize',12);
+                    case '2D'
+                        th = title(hplot, {'Trajectories';'[set of all spatial points over time]'},'Color','blue');
+                        xlabel(hplot,'x-coordinate [\mu m]', 'FontSize',12);
+                        ylabel(hplot,'y-coordinate [\mu m]', 'FontSize',12);
+                    case 'M'
+                        th = title(hplot, {'Detection metrics';'[robustness of pipette and bead detection over time]'},'Color','red');
+                        xlabel(hplot,'time [frames]', 'FontSize',12);
+                        ylabel(hplot,'metric', 'FontSize',12);
+                end
+                th.FontSize = 15;
             end
             
         end
@@ -396,10 +416,10 @@ classdef BFPClass < handle
                 end
             
                 % plot force of just calculated interval
-                plot( hplot, obj.intervallist(int).frames(1):obj.intervallist(int).frames(2),...
-                      obj.force(int).values,'g','HitTest','off' );
+%                 plot( hplot, obj.intervallist(int).frames(1):obj.intervallist(int).frames(2),...
+%                       obj.force(int).values,'g','HitTest','off' );
             end
-            legend(hplot,'force');
+            obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,false,false,'Style','F');
         end
         
         % return force value by frame;  %TODO: ADD INPUT PARSER

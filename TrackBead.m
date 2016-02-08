@@ -1,6 +1,6 @@
 function [ centres, radii, metrics, badFrames ] = TrackBead( vidObj, contrast, inicoor, varargin )
 %TrackBead Uses matlab function do detect dark or bright circles
-%   vidPath : path to the video file   
+%   vidObj  : object wrapping the video file
 %   contrast: contrast of the bead, either dark or bright
 %   inicoor : initial coordinate of the bead
 %   range   : the frame range to search for the bead
@@ -17,6 +17,7 @@ defaultSide         = [25,25];      % half of the side of the box around the cir
 defaultRobustness   = 0.8;          % level of bead metric considered too poor
 defaultImageQuality = 0.96;         % level of contrast considered too poor
 defaultReview       = 5;            % number of passed frames to calculate metric and contrast states
+defaultRetries      = 5;            % number of retries (conditions are relaxed during each retry)
 
 addRequired(inp,'vidObj');
 addRequired(inp,'contrast');
@@ -30,6 +31,7 @@ addParameter(inp,'side',defaultSide,@isnumeric);
 addParameter(inp,'robustness',defaultRobustness,@isnumeric);
 addParameter(inp,'quality',defaultImageQuality,@isnumeric);
 addParameter(inp,'review',defaultReview,@isnumeric);
+addParameter(inp,'retries',defaultRetries,@isnumeric);
 
 parse(inp, vidObj, contrast, inicoor, varargin{:});
 
@@ -46,6 +48,7 @@ side     = inp.Results.side;
 robust   = inp.Results.robustness;
 quality  = inp.Results.quality;
 review   = inp.Results.review;
+retries  = inp.Results.retries;
 % =======================================================================
 
 warn = 1;   % frame number of the last warning
@@ -91,7 +94,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range
     if(distance(1) == 0 && failcounter < buffer)     % failed to detect anything - 'buffer' consecutive failed detections allowed
         found = false;
         calls = 1;
-        while( ~found && calls < 5 );   % try progressively less restrictive search
+        while( ~found && calls <= retries );   % try progressively less restrictive search
             found = retry(calls); 
             calls = calls + 1;
         end;
@@ -101,7 +104,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range
             centre = centres(max(frames-1,1),:);% [x,y]
             rad = radii(max(frames-1,1),:);     % no modification
             metric = 0;                         % failure metric value is 0
-            warning(strjoin({'Bead detection failure at frame',num2str(range(1) + frames - 1),'\n',...
+            warning(strjoin({'Bead detection failure at frame',num2str(range(1) + frames - 1),char(10),...
                 'Consecutive failures: ', num2str(failcounter),'/',num2str(buffer)}));
         end
     elseif(distance(1) == 0 && failcounter >= buffer)    % 'buffer' failures in a row, abort
@@ -171,7 +174,7 @@ function [got] = retry(C)
     LP = lastPosition();
     thisFrame = range(1) - 1 + frames;
     [c,r,m] = TrackBead(vidObj,contrast,LP,[thisFrame,thisFrame],...
-        'radius', radius + [-C,+C], 'sensitivity', min(sensitivity+0.1*C,1), 'edge', max(edge-0.1*C,0));
+        'radius', radius + [-C,+C], 'sensitivity', min(sensitivity+0.1*C,1), 'edge', max(edge-0.1*C,0),'retries',0);
     
     if m > 0            % if bead is found
         centre = c;
