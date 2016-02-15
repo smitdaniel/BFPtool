@@ -1,3 +1,19 @@
+%   BFPGUI: Function running the BFPClass GUI
+%   Manages the analysis of a BFP experiment recording. Takes inputs from
+%   the user and calls appropriate computational methods to track and
+%   calculate forces. It performs many mainainance tasks (e.g. basic
+%   fitting, measurements, fine-tuning of the detection, and import-export
+%   tools.
+%   OUT:
+%   backdoorObj: is a handle class object, which is connected to some of
+%   the important parameters within the BFPClass and BFPGUI. It allows user
+%   to change these parameters from the Matlab command line. It is usually
+%   not necessary to access there paremeters.
+%   IN:
+%   loadData (Optional): allows user to start GUI instance with data 
+%   imported from an older MAT file form earlier session or another machine
+%   ======================================================================
+
 function [ backdoorObj ] = BFPGUI( varargin )
 
     function [is] = isMatFile(file)
@@ -31,6 +47,8 @@ function [ backdoorObj ] = BFPGUI( varargin )
 verbose = true;     % sets UI to provide more (true) or less (false) messages
 selecting = false;  % indicates, if selection is under way and blocks other callbacks of selection
 selectWrng = 'Another selection process is currently running. Finish the former and try again.';
+fitfontsize = 0.07; % normalized size of the font in equations
+labelfontsize = 0.07;   % normalized size of the font in labels
 
 % create backdoor object to modify hiddent parameters
 backdoorObj = BFPGUIbackdoor();
@@ -97,9 +115,9 @@ minLength   = 30;   % minimal number of frames to constitute plateau
 hfig = figure('Name', 'Pattern tracking','Units', 'normalized', 'OuterPosition', [0,0,1,1], ...
              'Visible', 'on', 'Selected', 'on');
 haxes = axes('Parent',hfig,'Units', 'normalized', 'Position', [0.05,0.05,0.5,0.5],...
-             'Visible', 'on');
+             'Visible', 'on','FontUnits','normalized');
 hgraph = axes('Parent',hfig,'Units','normalized', 'Position', [0.6,0.6,0.35,0.35],...
-             'ButtonDownFcn',{@getcursor_callback});
+             'ButtonDownFcn',{@getcursor_callback},'FontUnits','normalized');
 hmoviebar = uicontrol('Parent',hfig, 'Style', 'slider', 'Max', 1, 'Min', 0, 'Value', 0, ...
              'Units', 'normalized', 'Enable', 'off',...
              'SliderStep', [0.01, 1], 'Position', [0.05, 0.005, 0.5, 0.015],...
@@ -927,8 +945,8 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                     str = strcat('$$r=',num2str(coeff(1)),'$$');
                     pos = 0.5*[ (int(end) + int(1)), (ffrc(end)+ffrc(1)) ];
                     hfitplot(l).txt = text( 'Parent', hgraph, 'interpreter', 'latex', 'String', str, ...
-                'Units', 'data', 'Position', pos, 'Margin', 1, ...
-                'LineStyle','none', 'HitTest','off','FontSize',14, 'FontWeight','bold','Color','red',...
+                'Units', 'data', 'Position', pos, 'Margin', 1, 'FontUnits','normalized',...
+                'LineStyle','none', 'HitTest','off','FontSize',fitfontsize, 'FontWeight','bold','Color','red',...
                 'VerticalAlignment','top');
                 case 'exp'
                     if ~isempty(vidObj)     % make sure vidObj exist, if it doesn't, outer data are being fit
@@ -942,8 +960,8 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                     str = strcat('$$\eta=',num2str(coeff(1)),'$$');
                     pos = 0.5*[ (int(end) + int(1)), (ffrc(end)+ffrc(1)) ];
                     hfitplot(l).txt = text( 'Parent', hgraph, 'interpreter', 'latex', 'String', str, ...
-                'Units', 'data', 'Position', pos, 'Margin', 1, ...
-                'LineStyle','none', 'HitTest','off','FontSize',14, 'FontWeight','bold','Color','red',...
+                'Units', 'data', 'Position', pos, 'Margin', 1, 'FontUnits','normalized',...
+                'LineStyle','none', 'HitTest','off','FontSize',fitfontsize, 'FontWeight','bold','Color','red',...
                 'VerticalAlignment','middle');
                     hfitplot(l).ph = plot(hgraph, int, ffrc, 'r', 'HitTest', 'off');
                 case 'plat'
@@ -998,8 +1016,8 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                                 pos = [ 0.5*(subints(k,1)+subints(k,2)), backdoorObj.contrastPlateauDetectionLimit ];
                                 if (mod(k,2)==0); va='bottom'; else va='top';end;
                                 hsublimplot(k).txt = text( 'Parent', hgraph, 'String', strcat('[',num2str(subints(k,1)),':',num2str(subints(k,2)),']'), ...
-                                'Units', 'data', 'Position', pos, 'Margin', 1,'interpreter', 'latex', ...
-                                'LineStyle','none', 'HitTest','off','FontSize',10, 'Color','blue',...
+                                'Units', 'data', 'Position', pos, 'Margin', 1,'interpreter', 'latex', 'FontUnits','normalized', ...
+                                'LineStyle','none', 'HitTest','off','FontSize',fitfontsize, 'Color','blue',...
                                 'VerticalAlignment',va, 'HorizontalAlignment','center');
                                 disp(strcat('Low contrast warning: [',num2str(subints(k,1)),',',num2str(subints(k,2)),']'));
                             end
@@ -1021,8 +1039,8 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                         pos = [ 0.5*(locint(lim(1))+locint(lim(2))), plateaux(p).avgfrc ];
                         if (mod(p,2)==0); va='bottom'; else va='top';end;
                         hfitplot(p).txt = text( 'Parent', hgraph, 'interpreter', 'latex', 'String', str, ...
-                        'Units', 'data', 'Position', pos, 'Margin', 1, ...
-                        'LineStyle','none', 'HitTest','off','FontSize',10, 'FontWeight','bold','Color','red',...
+                        'Units', 'data', 'Position', pos, 'Margin', 1, 'FontUnits','normalized',...
+                        'LineStyle','none', 'HitTest','off','FontSize',fitfontsize, 'FontWeight','bold','Color','black',...
                         'VerticalAlignment', va, 'HorizontalAlignment','center');
                     end     
                     nextPlateau = numel(plateaux)+1;
@@ -1085,6 +1103,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     % the marking in the graph
     function getcursor_callback(source,~,delcall)
         if ~exist('delcall','var'); delcall = false; end;   % for full calls set to false
+        if isempty(thisPlot); return; end;  % if there is no plot yet, ignore the call
         persistent hline;
         persistent hdot;
         if ~isempty(hline); hline.delete; end;  % delete old selection, if any
@@ -1100,8 +1119,10 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             elseif thisPlot == 5;   % metrics
                 Ycoor = BFPobj.getByFrame(round(coor(1,1)),'metric');   % returns [bead, pipette]
             end
-            hline = plot(hgraph, [coor(1,1), coor(1,1)], hgraph.YLim, 'r','HitTest','off');      
+            yl = ylim(hgraph); 
+            hline = plot(hgraph, [coor(1,1), coor(1,1)], hgraph.YLim, 'r','HitTest','off');
             hdot = plot(hgraph, coor(1,1), Ycoor(1),'or','MarkerSize',10, 'LineWidth',2, 'HitTest','off');
+            ylim(hgraph,yl);    % block Y-axis rescaling
             if numel(Ycoor)==2; 
                 hdot(2) = plot(hgraph, coor(1,1), Ycoor(2),'or','MarkerSize',10, 'LineWidth',2, 'HitTest','off');
                 disp( ['Metrics (bead,pipette): [' num2str(round(coor(1,1))),',', num2str(Ycoor(1)),',', num2str(Ycoor(2)),']'] );
@@ -1573,7 +1594,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                 case 'Cancel'
                     return;
                 case 'Select'
-                    selectintbead_callback(hselectbead,0);
+                    getpoint_callback(hselectbead,0,'interval');
                     return;
             end
         end
@@ -2050,6 +2071,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         
         cla(hgraph);                % clear current graph
         hold(hgraph,'on');
+        set(hgraph, 'FontUnits','normalized','FontSize',labelfontsize);
         hconplot  = plot(hgraph,lowplot:highplot,contrast(lowplot:highplot),'r','HitTest','off');
 %        hgrayplot = plot(hgraph,lowplot:highplot,gray(lowplot:highplot), 'b', 'HitTest','off');
         xlim(hgraph,[lowplot,highplot]);    % avoid margins around the graph
@@ -2059,9 +2081,12 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         set( hlowplot,  'Enable','on', 'String', num2str(lowplot)  );
         set( hhighplot, 'Enable','on', 'String', num2str(highplot) );        
 %        legend(hgraph,'contrast','mean gray');
-        cl = legend(hgraph,'\fontsize{12} contrast');
+        cl = legend(hgraph,'contrast');
         cl.Box = 'off';
-        title(hgraph,{'\fontsize{15} Contrast measure';'[standard deviation of each frame]'},'Color','r');
+        cl.FontUnits = 'normalized';
+        title(hgraph,{'Contrast measure';'[standard deviation of each frame]'},'Color','r','FontUnits','normalized','FontSize',labelfontsize);
+        xlabel(hgraph, 'Time [frames]', 'FontUnits', 'normalized', 'FontSize', labelfontsize);
+        ylabel(hgraph, 'Contrast [r.u.]', 'FontUnits', 'normalized', 'FontSize', labelfontsize);
         
         % find plateaux and report 'safe' and 'unsafe' intervals
         % these parameters can be backdoored;
@@ -2097,7 +2122,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     % sets frame input into edit field after pressing a button
     function gotoframe_callback(~,~)
         % temporary edit field
-        hsetframe = uicontrol('Parent',husevideo, 'Style','edit', 'Units', 'normalized',...
+        hsetframe = uicontrol('Parent',husevideo, 'Style','edit', 'Units', 'normalized','FontUnits','normalized',...
              'Position', [0.8, 0.75, 0.2, 0.25],'String',num2str(getFrame()),'Callback', {@presetframe});
 
         % avoid errors; treat malformed input
@@ -2352,7 +2377,8 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         hmoviebar.Value = vidObj.CurrentFrame;        
         imagesc(frame.cdata, 'Parent', haxes);
         colormap(gray);        
-        axis(haxes, 'image');
+        axis(haxes, 'image');               % set limits of the canvas to 'image'
+        haxes.FontUnits = 'normalized';     % make sure ticks are rescaled with the window
         if disptrack
             hold(haxes, 'on')
             for i=1:numel(BFPobj.intervallist);

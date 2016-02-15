@@ -47,7 +47,11 @@ classdef BFPClass < handle
         DR = 0.1;   % implicit error of radius measurement, 0.1 micron
         linearLimit = 0.5;  % limit on extension for good linear approximation is ~500 nm
         
-        
+    end
+
+    properties (Constant)
+       labelfontsize = 0.07;    % font size for legend, axes etc. 
+       reportfontsize = 0.04;   % font size for a report pop-up window 
     end
     
     methods
@@ -188,6 +192,7 @@ classdef BFPClass < handle
             end;
                         
             cla(hplot,'reset');
+            set(hplot,'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
             
             for int=1:numel(obj.intervallist)
                 hold(hplot,'on');
@@ -202,9 +207,9 @@ classdef BFPClass < handle
                 if strcmp(style,'F')
                     plot( hplot, ffrm:lfrm, obj.force(int).values(start:stop),'g','HitTest','off' );
                     lh = legend(hplot,'force');
-                    th = title(hplot, 'Force [pN]','Color','green');
-                    xlabel(hplot, 'time [frames]', 'FontSize',12);
-                    ylabel(hplot, 'Force [pN]', 'FontSize',12);
+                    th = title(hplot, 'Force [pN]','Color','green', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    xlabel(hplot, 'time [frames]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    ylabel(hplot, 'Force [pN]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                 else
                     if pip && numel(obj.pipPositions) ~= 0;
                         if strcmp(style,'3D')
@@ -239,23 +244,24 @@ classdef BFPClass < handle
                     end
                 end
                 lh.Box = 'off';
-                lh.FontSize = 12;
+                lh.FontUnits = 'normalized';                
                 switch(style)
                     case '3D'
                         th = title(hplot, {'Tracks in time';'[third coordinate is temporal]'},'Color','blue');
-                        xlabel(hplot,'x-coordinate [\mu m]', 'FontSize',12);
-                        ylabel(hplot,'y-coordinate [\mu m]', 'FontSize',12);
-                        zlabel(hplot,'time [frames]','FontSize',12);
+                        xlabel(hplot,'x-coordinate [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                        ylabel(hplot,'y-coordinate [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                        zlabel(hplot,'time [frames]','FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     case '2D'
                         th = title(hplot, {'Trajectories';'[set of all spatial points over time]'},'Color','blue');
-                        xlabel(hplot,'x-coordinate [\mu m]', 'FontSize',12);
-                        ylabel(hplot,'y-coordinate [\mu m]', 'FontSize',12);
+                        xlabel(hplot,'x-coordinate [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                        ylabel(hplot,'y-coordinate [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     case 'M'
-                        th = title(hplot, {'Detection metrics';'[robustness of pipette and bead detection over time]'},'Color','red');
-                        xlabel(hplot,'time [frames]', 'FontSize',12);
-                        ylabel(hplot,'metric', 'FontSize',12);
+                        th = title(hplot, {'Detection metrics';'[robustness of pipette and bead detection]'},'Color','red');
+                        xlabel(hplot,'time [frames]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                        ylabel(hplot,'metric', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                 end
-                th.FontSize = 15;
+                th.FontUnits = 'normalized';
+                th.FontSize = BFPClass.labelfontsize;
             end
             
         end
@@ -539,12 +545,15 @@ classdef BFPClass < handle
         function [ ] = generateReport(obj)
             intervalstr = 'Intervals of uncertainty:\n\n';
             hrepfig = figure;
-            hrepax = axes('Parent',hrepfig,'Units','normalized','OuterPosition',[0,0,0.7,1]);
+            hrepax = axes('Parent',hrepfig,'Units','normalized','OuterPosition',[0,0,0.7,1],'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
             hold(hrepax,'on');
             for int=1:numel(obj.intervallist)
                 ffrm = obj.intervallist(int).frames(1);
                 lfrm = obj.intervallist(int).frames(2);
                 obj.plotTracks( hrepax, ffrm, lfrm, true,true,'Style','M');
+                xlabel( hrepax, 'Time [frames]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+                ylabel( hrepax, 'Contrast [r.u.]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+                title( hrepax, 'Detection metrics', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
                 ffrm = ffrm-1;
                 hold(hrepax,'on');
                 badBeads = fillHoles(obj.beadPositions(int).bads);
@@ -590,8 +599,8 @@ classdef BFPClass < handle
                     if(mod(b,2)==0); va='bottom';else va='top'; end;
                     text( 'Parent', hrepax, 'String', strcat('[',num2str(ffrm+bads(b,1)),':',num2str(ffrm+bads(b,2)),']'), ...
                                'Units', 'data', 'Position', pos, 'Margin', 4, 'interpreter', 'latex', ...
-                               'LineStyle','none', 'HitTest','off','FontSize',12, 'Color',colour,...
-                               'VerticalAlignment',va, 'HorizontalAlignment','center');
+                               'LineStyle','none', 'HitTest','off','FontUnits','normalized','FontSize',BFPClass.labelfontsize,...
+                               'Color',colour, 'VerticalAlignment',va, 'HorizontalAlignment','center');
                 end
             end
             
