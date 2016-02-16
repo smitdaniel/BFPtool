@@ -48,7 +48,7 @@ verbose = true;     % sets UI to provide more (true) or less (false) messages
 selecting = false;  % indicates, if selection is under way and blocks other callbacks of selection
 selectWrng = 'Another selection process is currently running. Finish the former and try again.';
 fitfontsize = 0.07; % normalized size of the font in equations
-labelfontsize = 0.07;   % normalized size of the font in labels
+labelfontsize = 0.05;   % normalized size of the font in labels
 
 % create backdoor object to modify hiddent parameters
 backdoorObj = BFPGUIbackdoor();
@@ -110,6 +110,9 @@ fitInt = [];        % interval of data to which apply the fitting procedure
 kernelWidth = 5;    % width of the differentiating kernel in plateau detection
 noiseThresh = sqrt(2);  % multiple of derivative's std to be considered noise (pleatea)
 minLength   = 30;   % minimal number of frames to constitute plateau
+hzeroline = [];     % handle of a line representing a zero force
+pushtxt   = [];     % texthandle for a pushing region descriptor ...
+pulltxt   = [];     % ... and the like for pulling region
 
 % ================= SETTING UP GUI CONTROLS =========================
 hfig = figure('Name', 'Pattern tracking','Units', 'normalized', 'OuterPosition', [0,0,1,1], ...
@@ -153,7 +156,7 @@ hffwdbutton = uicontrol('Parent', husevideo,'Style','pushbutton', ...
               uicontrol('Parent',husevideo, 'Style','text', 'Units', 'normalized','FontUnits','normalized',...
              'Position', [0.6, 0.75, 0.2, 0.25],'String','Frame: ','HorizontalAlignment','left');     
 hcontrast  = uicontrol('Parent',husevideo, 'Style','pushbutton','Units', 'normalized',...
-             'String', '<HTML><center>Analyse<br>contrast</HTML>', 'Position', [0,0,0.2,0.5],'FontUnits','normalized','Callback',{@getcontrast_callback},...
+             'String', '<HTML><center>Analyse<br>contrast</HTML>', 'Position', [0,0,0.2,0.5],'FontUnits','normalized','Callback',{@getcontrast_callback,'analysis'},...
              'TooltipString', 'Calculates contrast measure curve. Useful if splitting video into intervals.');
 hdispframe = uicontrol('Parent',husevideo, 'Style','pushbutton', 'Units', 'normalized','FontUnits','normalized',...
              'Position', [0.8, 0.75, 0.2, 0.25],'String','0/0','Callback',@gotoframe_callback,...
@@ -478,7 +481,7 @@ set([hfitline,hfitexp,hfitplateau,hgetplatwidth,hplatwidth,...
 
 % ================= IMPORT,EXPORT,UI SETTINGS ============================
 hio      = uipanel('Parent',hfig,'Title','Import, export, UI settings', 'Units','normalized',...
-            'Position', [0.33,0.66,0.12,0.30]);
+            'Position', [0.31,0.66,0.14,0.30]);
 hvar     = uicontrol('Parent', hio, 'Style', 'popupmenu', 'Units', 'normalized', 'String',...
             {'force & tracks'; 'frame'; 'graph'; 'parameters'}, 'Enable', 'on', 'Position',...
             [0,0.9,1,0.1], 'Callback', {@port_callback});
@@ -862,6 +865,11 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     % fitting the graph; only one type of fitting line at the time
     function fit_callback(~,~,type,limit)
         
+        % delete descriptive objects
+        if ~isempty(hzeroline); hzeroline.delete; end;
+        if ~isempty(pushtxt); pushtxt.delete; end;
+        if ~isempty(pulltxt); pulltxt.delete; end;
+        
         getcursor_callback(0,0,true);   % delete possible point marker
         
         % fitted lines are persistent; erased every time fitting is called
@@ -1048,14 +1056,15 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         end
     end
 
-    % select interval for fitting
+    % select interval for fitting; make sure to catch exceptions
     function fitint_callback(~,~)
-        hgraph.ButtonDownFcn = [];      % suppress buttonup callback for the graph
+        hgraph.ButtonDownFcn = [];      % suppress button-down callback for the graph
         hfitint.String = '<HTML><center>Accept<br>Interval</HTML>';
         hfitint.Callback = 'uiresume(gcbf)';
         hold(hgraph,'on');
         BCfunction = makeConstrainToRectFcn('impoint',get(hgraph,'XLim'),get(hgraph,'YLim'));
         Ymid = (hgraph.YLim(2)+hgraph.YLim(1))*0.5;
+        oldInt = fitInt;
         if isempty(fitInt)
             Xlen = hgraph.XLim(2)-hgraph.XLim(1);
             XC = [hgraph.XLim(1)+0.25*Xlen, hgraph.XLim(1)+0.75*Xlen];
@@ -1067,15 +1076,24 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         intpoint(1).addNewPositionCallback(@(pos) fitintNewPosition_callback(pos,1));
         intpoint(2).addNewPositionCallback(@(pos) fitintNewPosition_callback(pos,2));
         uiwait(gcf);
-        fitInt = round([ intpoint(1).getPosition(); intpoint(2).getPosition() ]);
+        try
+            fitInt = round([ intpoint(1).getPosition(); intpoint(2).getPosition() ]);
+        catch
+            warning(strjoin({'Interval selection process was interrupted by another action.',...
+                'Original interval was restored (or default in case of an empty original)',...
+                'Please try again, without any intermitten action during the process.'}));
+            if isempty(fitInt); fitInt = round([hgraph.XLim(1),0;hgraph.XLim(2),0]); % set default fitInt
+            else fitInt = oldInt; end;
+        end
         intpoint(1).delete;                 % remove points
         intpoint(2).delete;
-        fitintNewPosition_callback(0,0);    % remove red lines
+        fitintNewPosition_callback(0,0);    % remove red lines and assoc. coordinates
+        set([hfitline,hfitexp,hfitplateau,hplatwidth,hplatthresh,hplatmin],'Enable','on');  % activate fitting buttons
         hfitint.String = strcat('<HTML><center>Change<br>[',num2str(round(fitInt(1,1))),',',...
                                 num2str(round(fitInt(2,1))),']</HTML>');
         hfitint.Callback = @fitint_callback;        
         hgraph.ButtonDownFcn = {@getcursor_callback};       % return the the general buttonup callback
-        set([hfitline,hfitexp,hfitplateau,hplatwidth,hplatthresh,hplatmin],'Enable','on');  % activate fitting buttons
+        
     end
 
     % callback called when impoint gets new position
@@ -1090,10 +1108,14 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         if(var==0)  % remove both
             if ~isempty(hline(1).ph); hline(1).ph.delete; end;
             if ~isempty(hline(2).ph); hline(2).ph.delete; end;
+            if ~isempty(hline(1).cx); hline(1).cx = []; end;
+            if ~isempty(hline(2).cx); hline(2).cx = []; end;
             return;
         end
         if ~isempty(hline(var).ph); hline(var).ph.delete; end;
+        yl = hgraph.YLim;
         hline(var).ph = plot(hgraph, [coor(1), coor(1)], hgraph.YLim, 'r', 'HitTest','off');
+        ylim(hgraph,yl);
         hline(var).cx = coor(1);
         hfitint.String = strcat('<HTML><center><font color="red">Accept<br>[',num2str(round(hline(1).cx)),',',...
                                 num2str(round(hline(2).cx)),']</HTML>');
@@ -1111,6 +1133,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         if delcall; return; end;    % if only delete call, stop here
         hold(hgraph,'on');        
         coor = get(source, 'CurrentPoint');
+        if (coor(1,1) < hgraph.XLim(1) || coor(1,1) > hgraph.XLim(2)); return; end; % ignore clicks outside the canvas
         if (thisPlot == 1 || thisPlot==4 || thisPlot==5)
             if thisPlot == 1;       % contrast
                 Ycoor = vidObj.getContrastByFrame(round(coor(1,1)));
@@ -1173,7 +1196,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             case 1  % contrast
                 reset(hgraph);
                 fitInt = [lowplot,0;highplot,0];
-                getcontrast_callback(0,0);  % calls contrast procedure to calculate and plot contrast
+                getcontrast_callback(0,0,'user');  % calls contrast procedure to calculate and plot contrast
             case 2  % tracks
                 if (hgraphpip.Value || hgraphbead.Value)
                     BFPobj.plotTracks(hgraph,lowplot,highplot,logical(hgraphpip.Value),logical(hgraphbead.Value),'Style','3D');  % call plotting function with lower and upper bound
@@ -1199,6 +1222,15 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             case 4  % force
                 BFPobj.plotTracks(hgraph,lowplot,highplot,false,false,'Style','F');
                 thisRange = [lowplot, highplot];
+                hzeroline = plot(hgraph,BFPobj.minFrame:BFPobj.maxFrame,zeros(1,BFPobj.maxFrame-BFPobj.minFrame+1),...
+                     '--r','LineWidth',2,'HitTest','off');
+                pushtxt = text(hgraph.XLim(2),0,'Pushing','Parent',hgraph,'FontUnits','normalized',...
+                    'HorizontalAlignment','right', 'VerticalAlignment','top','Color','red',...
+                    'FontSize',labelfontsize,'Margin',5,'HitTest','off');
+                pulltxt = text(hgraph.XLim(2),0,'Pulling','Parent',hgraph,'FontUnits','normalized',...
+                    'HorizontalAlignment','right', 'VerticalAlignment','bottom','Color','red',...
+                    'FontSize',labelfontsize,'Margin',5,'HitTest','off');
+                
             case 5  % metrics
                 if (hgraphpip.Value || hgraphbead.Value)
                     BFPobj.plotTracks(hgraph,lowplot,highplot,logical(hgraphpip.Value),logical(hgraphbead.Value),'Style','M');
@@ -1224,7 +1256,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                 'displayed in red.'}),'RBC extension over linear limit','replace');
         else
             warndlg(strjoin({'The detected extensions of the RBC are within the boundaries of'...
-                'linear approximation. In such cases, infotext reporting stiffness in displayed'...
+                'linear approximation. In such cases, infotext reporting stiffness is displayed'...
                 'in blue.'}),'RBC extension within linear limit','replace');
         end
     end
@@ -1234,7 +1266,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         if verbose; 
             choice = questdlg(strjoin({'This action runs force calculation. The force, however,',...
                 'must be calibrated (i.e. stiffness ''k'' calculated) using experiment settings dependent parameters',...
-                'adjustable in ''Experimental data'' panel. Initially, it contains only order of magnitude',...
+                'adjustable in ''Experimental parameters'' panel. Initially, it contains only order of magnitude',...
                 'values, to give an idea of force time dependence. If You want to have results properly',...
                 'calibrated for Your experiment, please review these values before the calculation.'}),...
                 'Parameters for force calculation', 'Review', 'Proceed', 'Review');
@@ -2050,7 +2082,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     end
 
     % plot the contrast progress of the video
-    function getcontrast_callback(~,~)
+    function getcontrast_callback(~,~,srctag)
         % if video is long, issue notice
         if vidObj.Frames > 1000 && verbose && numel(vidObj.Contrast) ~= vidObj.Frames
             choice = questdlg(strjoin({'The video consists of more than 1000 frames. Depending on Your system,',...
@@ -2065,8 +2097,12 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         end
         [ contrast, ~ ] = vidObj.getContrast;    % calculates and saves in video object, if not yet calculated
         
-        lowplot = 1;                % initial frame
-        highplot = vidObj.Frames;   % final frame
+        % if it is analysis call, take the whole domain
+        if strcmp(srctag,'analysis')
+            lowplot = 1;                % initial frame
+            highplot = vidObj.Frames;   % final frame
+        end
+        
         fitInt = [lowplot, 0; highplot, 0];  % set global fit interval
         
         cla(hgraph);                % clear current graph
@@ -2094,26 +2130,28 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         % informative, so user should need to change them. More
         % sophisticated analysis can be done using adaptive plateaux
         % fitting.
-        
-        % save default values suitable for force plateaux detection
-        defaults = [ kernelWidth, noiseThresh, minLength ];
-        
-        kernelWidth = backdoorObj.contrastPlateauDetectionSensitivity;
-        noiseThresh = backdoorObj.contrastPlateauDetectionThreshold;
-        minLength   = backdoorObj.contrastPlateauDetectionLength;
-        
-        fit_callback(0,0,'plat',true);
-        
-        % restore defaults
-        [kernelWidth] = defaults(1);
-        [noiseThresh] = defaults(2);
-        [minLength]   = defaults(3);
-        
-        if verbose;
-            helpdlg(strjoin({'Contrast analysis has finished. The detected plateaux (in red) are the safest',...
-                'intervals for tracking. Drop in contrast of more than',num2str((1-backdoorObj.contrastPlateauDetectionLimit)*100),'%',...
-                'off maximum is designated (if detected) in blue. Those intervals might be unsuitable for tracking.'}),...
-                'Contrast analysis finished');
+        if strcmp(srctag,'analysis')    % if the call comes from analysis
+            
+            % save default values suitable for force plateaux detection
+            defaults = [ kernelWidth, noiseThresh, minLength ];
+
+            kernelWidth = backdoorObj.contrastPlateauDetectionSensitivity;
+            noiseThresh = backdoorObj.contrastPlateauDetectionThreshold;
+            minLength   = backdoorObj.contrastPlateauDetectionLength;
+
+            fit_callback(0,0,'plat',true);
+
+            % restore defaults
+            [kernelWidth] = defaults(1);
+            [noiseThresh] = defaults(2);
+            [minLength]   = defaults(3);
+
+            if verbose;
+                helpdlg(strjoin({'Contrast analysis has finished. The detected plateaux (in red) are the safest',...
+                    'intervals for tracking. Drop in contrast of more than',num2str((1-backdoorObj.contrastPlateauDetectionLimit)*100),'%',...
+                    'off maximum is designated (if detected) in blue. Those intervals might be unsuitable for tracking.'}),...
+                    'Contrast analysis finished');
+            end
         end
         
         hgraph.ButtonDownFcn = {@getcursor_callback};
@@ -2334,7 +2372,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             choice = questdlg('Was the bead detected correctly?','Confirm selection','Accept','Reject','Accept');
             switch choice
                 case 'Accept'   % precise the coordinate
-                    beadinfo.coor = coor;
+                    beadinfo.coor = [coor(2), coor(1) ];
                     pass = true;
                 case 'Reject'
                     beadinfo = bead;

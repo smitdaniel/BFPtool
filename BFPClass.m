@@ -50,7 +50,7 @@ classdef BFPClass < handle
     end
 
     properties (Constant)
-       labelfontsize = 0.07;    % font size for legend, axes etc. 
+       labelfontsize = 0.05;    % font size for legend, axes etc. 
        reportfontsize = 0.04;   % font size for a report pop-up window 
     end
     
@@ -551,6 +551,7 @@ classdef BFPClass < handle
                 ffrm = obj.intervallist(int).frames(1);
                 lfrm = obj.intervallist(int).frames(2);
                 obj.plotTracks( hrepax, ffrm, lfrm, true,true,'Style','M');
+                set(hrepax, 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
                 xlabel( hrepax, 'Time [frames]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
                 ylabel( hrepax, 'Contrast [r.u.]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
                 title( hrepax, 'Detection metrics', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
