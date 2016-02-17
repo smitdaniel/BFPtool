@@ -104,8 +104,10 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range
             centre = centres(max(frames-1,1),:);% [x,y]
             rad = radii(max(frames-1,1),:);     % no modification
             metric = 0;                         % failure metric value is 0
-            warning(strjoin({'Bead detection failure at frame',num2str(range(1) + frames - 1),char(10),...
+            if (calls==retries) % if detection fails for all retries
+                warning(strjoin({'Bead detection failure at frame',num2str(range(1) + frames - 1),char(10),...
                 'Consecutive failures: ', num2str(failcounter),'/',num2str(buffer)}));
+            end;
         end
     elseif(distance(1) == 0 && failcounter >= buffer)    % 'buffer' failures in a row, abort
         error(strjoin({num2str(buffer),' consecutive failures, abort at frame', num2str(range(1) + frames - 1)}));

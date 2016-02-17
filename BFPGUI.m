@@ -1079,9 +1079,8 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         try
             fitInt = round([ intpoint(1).getPosition(); intpoint(2).getPosition() ]);
         catch
-            warning(strjoin({'Interval selection process was interrupted by another action.',...
-                'Original interval was restored (or default in case of an empty original)',...
-                'Please try again, without any intermitten action during the process.'}));
+            warn('interrupt',...
+                'Original interval was restored (or set to default in case of an empty original interval)');
             if isempty(fitInt); fitInt = round([hgraph.XLim(1),0;hgraph.XLim(2),0]); % set default fitInt
             else fitInt = oldInt; end;
         end
@@ -1582,6 +1581,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         if strcmp(choice, 'Cancel')
             return;
         end
+        inPattern = interval.pattern;   % input pattern
         hpatfig  = figure;  % create new figure with a button, displaying the pattern
         hpataxes = axes('Parent',hpatfig, 'Units','normalized','Position',[0,0.2,1,0.8]);
         imagesc(interval.pattern, 'Parent',hpataxes);
@@ -1591,13 +1591,23 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                 'Units','normalized','Enable','off','Position',[0.2,0,0.2,0.15],'Callback','uiresume(gcbf)');
         BCfunction = makeConstrainToRectFcn('impoint',get(hpataxes,'XLim'),get(hpataxes,'YLim'));
         beadpoint = impoint(hpataxes,'PositionConstraintFcn', BCfunction);
-        haccept.Enable = 'on';
-        uiwait(gcf);
-        subcoor = (beadpoint.getPosition);
-        beadpoint.delete;
-        hpatsubcoor.String = strcat('[',num2str(round(subcoor(1))),',',num2str(round(subcoor(2))),']');
-        interval.patsubcoor = subcoor;
-        close(hpatfig);
+        try
+            haccept.Enable = 'on';              % enable 'accept' btn
+            uiwait(gcf);                        % wait for acceptance (only one button)
+            subcoor = (beadpoint.getPosition);  % read the value
+            if isequal(inPattern,interval.pattern)  % check if the pattern was not changed in the meantime
+                interval.patsubcoor = subcoor;      % save new selected value
+                hpatsubcoor.String = strcat('[',num2str(round(subcoor(1))),','...
+                                ,num2str(round(subcoor(2))),']');   % update the string
+            else
+                warn('The pattern was changed during anchor selection process.',...
+                        'No changes were made.');
+            end
+        catch
+            warn('interrupt','Original value of anchor was kept, any possible input discarded.');
+        end
+        beadpoint.delete;   % delete the impoint object
+        if isgraphics(hpatfig); close(hpatfig); end;     % close the figure (if not closed)
     end
         
     % set current frame to the first frame of the interval
@@ -1609,7 +1619,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     function getintbead_callback(~,~)
         % check if there is a bead in the list to add
         if numel(beadlist)==0 || isempty(beadlist(hbeadinilist.Value));
-            warning('No bead has been added to the list');
+            warn('No bead has been added to the list');
             return;
         end;
         
@@ -1645,7 +1655,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     function getintpat_callback(~,~)
         % check if there's a pattern in the list to add
         if numel(patternlist)==0 || isempty(patternlist(hpatternlist.Value))
-            warning('No pipette pattern in the list');
+            warn('No pipette pattern in the list');
             return;
         end
         
@@ -1670,7 +1680,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     % displays the pattern selected for the given interval
     function [hpatfig,hpataxes] = showintpattern_callback(~,~)
         if ~isfield(interval,'pattern');
-            warndlg('Nothing to show. Choose a pipette pattern first','No pipette pattern selected','replace');
+            warn('Nothing to show. Select a pipette pattern first');
             return;
         end;
         hpatfig  = figure;  % open new figure
@@ -1724,55 +1734,91 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
 
     % measure radius of the pipette
     function measureLength_callback(source,~,type)
+        if selecting; 
+            warn('select');
+            return;
+        else selecting = true; 
+        end;
+        
         if verbose;
             msgOptions.Interpreter = 'Latex';
             msgOptions.WindowStyle  = 'modal';
-            msgbox(strjoin({'Select the {\bfseries diameter} of the', type}),'Radius measurement', msgOptions);
+            msgbox(strjoin({'Select the {\bfseries diameter} of the', type,...
+                '. The measured length will be converted into radius.'}),...
+                'Radius measurement', msgOptions);
         end
         BCfunction = makeConstrainToRectFcn('imline',get(haxes,'XLim'),get(haxes,'YLim'));
         line = imline(haxes,'PositionConstraintFcn',BCfunction);
         source.String = 'Confirm';
         source.Callback = 'uiresume(gcbf)';
         uiwait(gcf);
-        LineEnds = line.getPosition;
-        line.delete;
-        length_ = norm( LineEnds(1,:)-LineEnds(2,:) );
-        if strcmp(type,'pipette')
-            PIPradius = 0.5*length_*P2M;
-            hPIPrad.String = num2str(round(PIPradius,2));
-        else
-            CAradius = 0.5*length_*P2M;
-            hCArad.String = num2str(round(CAradius,2));
-        end        
-        source.Callback = {@measureLength_callback,type};
-        str = strjoin({type,'radius'});
+        try
+            LineEnds = line.getPosition;
+            line.delete;
+            length_ = norm( LineEnds(1,:)-LineEnds(2,:) );
+            if strcmp(type,'pipette')
+                PIPradius = 0.5*length_*P2M;
+                hPIPrad.String = num2str(round(PIPradius,2));
+            else
+                CAradius = 0.5*length_*P2M;
+                hCArad.String = num2str(round(CAradius,2));
+            end
+        catch
+            warn('interrupt',...
+                strjoin({'The',type,'radius detection failed, no changes were made.'}));
+        end
+        source.Callback = {@measureLength_callback,type};   % reset callback
+        str = strjoin({type,'radius:'});                     % reset string
         str(1) = upper(str(1));
         source.String = str;
+        selecting = false;
     end
 
-    % detects the RBC and measures its radius
+    % detects the RBC and measures its radius, using the TrackBead method
     function measureRBC_callback(source,~)
+        if selecting;   % make sure only one selection runs at a time
+            warning('select');
+            return;
+        else selecting = true;  % set selecting flag
+        end;
         BCfunction = makeConstrainToRectFcn('impoint',get(haxes,'XLim'),get(haxes,'YLim'));
         RBCpoint = impoint(haxes,'PositionConstraintFcn',BCfunction);
         source.String = 'Confirm';
         source.Callback = 'uiresume(gcbf)';
         uiwait(gcf);
-        RBCinicoor = (RBCpoint.getPosition);
-        RBCframe = round(vidObj.CurrentFrame);
+        try     % this type of selection is very error-prone, if user doesn't follow the instructions
+            RBCinicoor = (RBCpoint.getPosition);
+            RBCframe = round(vidObj.CurrentFrame);
+            RBCcontrast = questdlg('Does the red blood cell appear bright or dark?',...
+                                   'RBC contrast','bright','dark','bright');
+            [RBCcoor,RBCradius_,RBCmet,~] = TrackBead(vidObj,RBCcontrast,RBCinicoor,[RBCframe,RBCframe],...
+                                       'radius',[20,30], 'sensitivity',0.95,'edge',0.1);
+            if ( RBCradius_==0 ) % nothing detected
+                warn(strjoin({'The RBC detection failed, no valid result returned.',...
+                        'Make sure the cell is well visible, with clear edge (if possible)',...
+                        'in the frame of selection, and try again.'}));
+            else
+                if RBCmet < beadmetricthresh && verbose
+                    warn(strjoin({'The RBC was detected, but the strength of the detection',...
+                        'is rather low, with',num2str(RBCmet),'below the threshold of',...
+                        num2str(beadmetricthresh),'Review, if the detection appears correct.'}));
+                end;
+                hRBCshow = viscircles(haxes,[RBCcoor(2),RBCcoor(1)],RBCradius_);
+                found = questdlg('Was the RBC detected correctly?','Confirm RBC detection','Accept','Cancel','Accept');
+                if strcmp(found, 'Accept')
+                    RBCradius = RBCradius_*P2M;
+                    hRBCrad.String = num2str(round(RBCradius,2));
+                end
+            end
+        catch
+            warn('interrupt');
+        end
         RBCpoint.delete;
-        RBCcontrast = questdlg('Does the red blood cell appear bright or dark?','RBC contrast','bright','dark','bright');
-        [RBCcoor,RBCradius_,~,~] = TrackBead(vidObj,RBCcontrast,RBCinicoor,[RBCframe,RBCframe],...
-            'radius',[20,30], 'sensitivity',0.95,'edge',0.1);
-        hRBCshow = viscircles(haxes,[RBCcoor(2),RBCcoor(1)],RBCradius_);
-        found = questdlg('Was the RBC detected correctly?','Confirm RBC detection','Accept','Cancel','Accept');
-        if strcmp(found, 'Accept')
-            RBCradius = RBCradius_*P2M;
-            hRBCrad.String = num2str(round(RBCradius,2));
-        end        
-        source.Callback = {@measureRBC_callback};
-        source.String = 'RBC radius';
-        pause(2);
-        hRBCshow.delete;       % delete the bead outline
+        source.Callback = {@measureRBC_callback};   % restore callback
+        source.String = 'RBC radius:';
+        pause(2);   % wait, so the user can see the RBC outline
+        if exist('hRBCshow','var'); hRBCshow.delete; end;       % delete the RBC outline (if created)
+        selecting = false;  % remove selecting flag
     end
 
     % set experimental parameters; validate input
@@ -1868,7 +1914,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     % add the selected bead coordinate to list
     function addbead_callback(~,~)
         if isempty(lastlistbead);
-            warning('No bead to add');
+            warn('No bead to add.');
             return;
         end;
         beadlist = strucopy(beadlist,lastlistbead);     % push back bead to the beadlist
@@ -1907,7 +1953,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     % button adds current pattern to the pattern list
     function addpattern_callback(~,~)
         if isempty(lastlistpat);
-            warning('No pattern to add');
+            warn('No pattern to add.');
             return;
         end;
         patternlist = strucopy(patternlist,lastlistpat);    % adds new pattern to the end of the list
@@ -1971,14 +2017,14 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                                         ';',num2str(bead.frame),']');
             case 'interval' % call source is direct interval bead detection
                 if (interval.frames(1) ~= bead.frame)
-                    warning(strjoin({'Initial frame of current tracking interval was changed',...
+                    warn(strjoin({'Initial frame of current tracking interval was changed',...
                             'to the frame of bead selection. If You wish to preserve Your interval,',...
                             'reselect the bead in the appropriate frame.'}));
                     interval.frames(1) = bead.frame;
                     hstartint.String = num2str(round(interval.frames(1)));
                 end;
                 if (interval.frames(2) == 0 || interval.frames(2) < interval.frames(1))
-                    warning(strjoin({'Final frame of current tracking interval was invalid',...
+                    warn(strjoin({'Final frame of current tracking interval was invalid',...
                         'and was changed. The final frame must not precede the initial.'}));
                     interval.frames(2) = interval.frames(1);
                     hendint.String = num2str(round(interval.frames(2)));
@@ -2598,6 +2644,39 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                                 'Select a file for import',inipath);    % choose path and file for matlab export
         end
         importfile = fullfile(dir,filename);
+        
+    end
+
+    % function to display warning dialogue or just command line warning,
+    % depending on the 'verbose' variable; Some warning messages are preset
+    % otherwise, the passed string is displayed
+    function warn( type, append )
+                
+        % construct the string
+        switch type
+            case 'select'
+                str = selectWrng;
+                name = 'Concurrent selection';
+            case 'interrupt'
+                str = strjoin({'Selection process was interrupted by another action.',...
+                'Please try again, without any intermittent action during the process.'});
+                name = 'Interrupted selection';
+            otherwise
+                str = type;
+                name = 'Specific warning';
+        end
+        
+        if exist('append','var');
+            strParts = {str,append};
+            str = strjoin(strParts,'\n\n');   % construct two-part warning
+        end;
+       
+        % display either the warining dialogue or command line warning
+        if verbose
+            warndlg(str, name, 'replace');
+        else
+            warning(str);
+        end            
         
     end
 
