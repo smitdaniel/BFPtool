@@ -16,6 +16,7 @@
 
 function [ backdoorObj ] = BFPGUI( varargin )
 
+    % verify if passed input is a MAT file
     function [is] = isMatFile(file)
         is = false;
         if exist(file,'file')
@@ -33,6 +34,7 @@ function [ backdoorObj ] = BFPGUI( varargin )
     
     loadData = inp.Results.loadData;
     
+    % if the data exist, re-start the saved instance and kill this run
     if loadData; 
         GUIdata = load(loadData);
         backdoorObj = GUIdata.backdoorObj;
@@ -46,20 +48,21 @@ function [ backdoorObj ] = BFPGUI( varargin )
 % UI settings
 verbose = true;     % sets UI to provide more (true) or less (false) messages
 selecting = false;  % indicates, if selection is under way and blocks other callbacks of selection
-selectWrng = 'Another selection process is currently running. Finish the former and try again.';
 fitfontsize = 0.07; % normalized size of the font in equations
-labelfontsize = 0.05;   % normalized size of the font in labels
+labelfontsize = 0.05;   % normalized size of the font in (some) labels
+% verbose is a switch for a 'warn' method. It decides whether some of the
+% warnings appear as warning dialogies, or just command line warnings
 
 % create backdoor object to modify hiddent parameters
 backdoorObj = BFPGUIbackdoor();
 
 % variables related to tracking
-pattern = [];       % pattern to be tracked over the video
+pattern = [];       % pattern to be tracked over the video; an image
 lastlistpat = [];   % the last pattern chosen for the list
-patternlist = [];
+patternlist = [];   % list of selected patterns
 bead = [];          % coordinates of bead to be tracked over the video
 lastlistbead = [];  % the last bead chosen for the list
-beadlist = [];
+beadlist = [];      % the list of inicial coordinates of beads for tracking
 beadradius = [8,18];    % limits on radius of the bead
 beadbuffer = 5;         % limit on grace period if bead cannot be detected (in frames)
 pipbuffer = 5;          % limit on grace period if pipette pattern can't be detected (in frames)
@@ -73,7 +76,7 @@ overLimit = false;      % indicates if currently calculated force is within line
 % variables related to video file
 vidObj = [];        % video wrapper, to open videos (AVI,MP4,...) and TIFF alike
 videopath = pwd;    % path to the video file
-vidFrameNo = 0;     % number of the current frame
+vidFrameNo = 0;     % number of the currently displayed frame
 frame = [];         % the currently displayed frame
 playing = true;     % video is allowed to play
 disptrack = false;  % display track marks on the video
@@ -86,7 +89,7 @@ RBCradius = 2.5;    % radius of RBC
 PIPradius = 1;      % inner pipette radius
 CAradius = 1.5;     % radius of contact between streptabead and RBC
 P2M = 0.1024;       % pixels to microns coefficient
-stiffness = 200;    % RBC stiffness
+stiffness = 200;    % RBC stiffness, in pN/micron
 
 % tracking data
 intfields = { 'pattern', 'patcoor', 'beadcoor', 'patsubcoor', 'contrast','reference' };
@@ -94,10 +97,10 @@ colnames = {'Range|Start', 'Range|End', 'Bead|X-coor', 'Bead|Y-coor', 'Pipette|X
 colformat = {'numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','logical'};
 tmpbeadframe = [];  % stores value of current bead frame selected for the interval
 tmppatframe = [];   % ... and the same for the pipette pattern
-interval = struct('frames', [0,0]);
-intervallist = [];
+interval = struct('frames', [0,0]); % currently assembled interval (not in the list yet)
+intervallist = [];  % list of tracking intervals with settings
 BFPobj = [];        % BFPClass object containing the calculation/tracking
-remove = [];        % list of interval entries to remove
+remove = [];        % list of interval entries to remove from the complete list
 updpatframe = 0;    % pipette pattern originating frame, updated during addition process
 
 % plotting and fitting settings
@@ -109,7 +112,7 @@ thisRange = [];     % current range of frames of the plot
 fitInt = [];        % interval of data to which apply the fitting procedure
 kernelWidth = 5;    % width of the differentiating kernel in plateau detection
 noiseThresh = sqrt(2);  % multiple of derivative's std to be considered noise (pleatea)
-minLength   = 30;   % minimal number of frames to constitute plateau
+minLength   = 30;   % minimal number of frames to constitute a plateau
 hzeroline = [];     % handle of a line representing a zero force
 pushtxt   = [];     % texthandle for a pushing region descriptor ...
 pulltxt   = [];     % ... and the like for pulling region
@@ -131,14 +134,15 @@ hmoviebar = uicontrol('Parent',hfig, 'Style', 'slider', 'Max', 1, 'Min', 0, 'Val
 hopenvideo = uibuttongroup('Parent', hfig, 'Title','Open a video', 'Position', [0.05, 0.56, 0.25, 0.075]);
 hvideopath = uicontrol('Parent',hopenvideo, 'Style', 'edit', ...
             'Units', 'normalized',...
-            'String', videopath, 'Position', [0, 0.5, 1, 0.5],'FontUnits','normalized',...
+            'String', videopath, 'Position', [0, 0.5, 1, 0.5],...
             'Enable', 'on','Callback',{@videopath_callback});
 hvideobutton = uicontrol('Parent',hopenvideo,'Style','pushbutton',...
-             'Units', 'normalized', 'Position', [0,0,0.2,0.5],'FontUnits','normalized', ...
+             'Units', 'normalized', 'Position', [0,0,0.2,0.5], ...
              'String', 'Open', 'Callback',{@openvideo_callback});
 hvideobrowse = uicontrol('Parent',hopenvideo,'Style','pushbutton',...
-             'Units', 'normalized', 'Position', [0.2,0,0.2,0.5],'FontUnits','normalized', ...
-             'String', 'Browse', 'Callback',{@browsevideo_callback});         
+             'Units', 'normalized', 'Position', [0.2,0,0.2,0.5], ...
+             'String', 'Browse', 'Callback',{@browsevideo_callback});
+set([hvideobutton,hvideobrowse,hvideopath],'FontUnits','normalized');         
 % ====================================================================    
 
 % ================= WORKING WITH THE VIDEO ===========================
@@ -162,22 +166,23 @@ hdispframe = uicontrol('Parent',husevideo, 'Style','pushbutton', 'Units', 'norma
              'Position', [0.8, 0.75, 0.2, 0.25],'String','0/0','Callback',@gotoframe_callback,...
              'Enable','off');
 hdisptrack = uicontrol('Parent', husevideo, 'Style', 'checkbox', 'Units', 'normalized',...
-             'String', 'Display track info', 'Position', [0.6, 0.5, 0.4, 0.25],'FontUnits','normalized',...
+             'String', 'Display track info', 'Position', [0.6, 0.5, 0.4, 0.25],...
              'HorizontalAlignment','left','TooltipString','Displays tracking results on top of the video',...
              'Value', disptrack, 'Callback', {@disptrack_callback});
 hgenfilm   = uicontrol('Parent', husevideo', 'Style', 'pushbutton', 'Units', 'normalized', ...
              'String',{'<HTML><center>Generate<br>film'}, 'Position', [0.2,0,0.2,0.5], 'FontUnits','normalized','Callback', {@generatefilm_callback},...
              'TooltipString','Generates a video file as an overlay of the open video and tracking marks');
-hframeratetxt = uicontrol('Parent', husevideo, 'Style', 'text','Units','normalized', 'FontUnits','normalized',...
+hframeratetxt = uicontrol('Parent', husevideo, 'Style', 'text','Units','normalized', ...
              'String','Framerate:','Position',[0.4,0.25,0.2,0.25],'HorizontalAlignment', 'left');
-hsamplingtxt  = uicontrol('Parent', husevideo, 'Style', 'text','Units','normalized','FontUnits','normalized',...
+hsamplingtxt  = uicontrol('Parent', husevideo, 'Style', 'text','Units','normalized',...
              'String','Sampling:','Position',[0.4,0,0.2,0.25],'HorizontalAlignment', 'left',...
              'TooltipString','<HTML>The number signifies each n-th frame of the original video to be processed.<br>Note that processing long videos can be time demanding.</HTML>');
 hfrmrate    = uicontrol('Parent',husevideo,'Style','edit','Units','normalized',...
-             'String',num2str(10),'Position', [0.6,0.25,0.2,0.25],'FontUnits','normalized','Callback',{@outvideo_callback,10,1});
+             'String',num2str(10),'Position', [0.6,0.25,0.2,0.25],'Callback',{@outvideo_callback,10,1});
 hsampling   = uicontrol('Parent',husevideo,'Style','edit','Units','normalized',...
-             'String',num2str(1),'Position',[0.6,0,0.2,0.25],'FontUnits','normalized','Callback',{@outvideo_callback,1,2});
-set([hplaybutton,hrewindbtn,hffwdbutton,hcontrast,hgenfilm],'Enable','off');         
+             'String',num2str(1),'Position',[0.6,0,0.2,0.25],'Callback',{@outvideo_callback,1,2});
+set([hplaybutton,hrewindbtn,hffwdbutton,hcontrast,hgenfilm],'Enable','off');     
+set([hdisptrack,hframeratetxt,hsamplingtxt,hfrmrate,hsampling], 'FontUnits','normalized');
 % ====================================================================
 
 % ================= PATTERN COLLECTION ===============================
@@ -186,17 +191,18 @@ hpatterns = uibuttongroup('Parent', hfig, 'Title', 'Pipette patterns', 'Units', 
 hpatternlist = uicontrol('Parent', hpatterns, 'Style', 'popup', 'String', {'no data'},...
             'Units', 'normalized', 'Position', [0,0.8,1, 0.2], 'FontUnits','normalized','Callback', {@pickpattern_callback});
 haddpatternbtn = uicontrol('Parent', hpatterns, 'Style', 'pushbutton', 'Units','normalized',...
-            'Position', [0,0.5,0.5,0.15], 'FontUnits','normalized','String', 'Add', 'Callback', {@addpattern_callback});
+            'Position', [0,0.5,0.5,0.15], 'String', 'Add', 'Callback', {@addpattern_callback});
 hrmpatternbtn = uicontrol('Parent', hpatterns, 'Style', 'pushbutton', 'Units','normalized',...
-            'Position', [0.5,0.5,0.5,0.15],'FontUnits','normalized', 'String', 'Remove', 'Callback', {@rmpattern_callback});      
+            'Position', [0.5,0.5,0.5,0.15],'String', 'Remove', 'Callback', {@rmpattern_callback});      
 hrectbutton = uicontrol('Parent',hpatterns,'Style','pushbutton',...
              'Units', 'normalized', 'Interruptible', 'off','BusyAction','cancel',...
-             'Position', [0,0.65,0.5,0.15], 'FontUnits','normalized','String', 'Select', 'Callback',{@getrect_callback,'list'});
+             'Position', [0,0.65,0.5,0.15], 'String', 'Select', 'Callback',{@getrect_callback,'list'});
 hpatcoortxt = uicontrol('Parent', hpatterns, 'Style', 'text' , 'String', {'[.,.;,]'},...
             'Units', 'normalized', 'Position', [0.5,0.65,0.5,0.15],'FontUnits','normalized');
 hminiaxes = axes('Parent',hpatterns, 'Units', 'normalized', 'Position', [0.05, 0.05, 0.9, 0.44],'FontUnits','normalized',...
              'Visible', 'on', 'XTickLabel', '', 'YTicklabel', '' );
 align(hpatcoortxt,'Left','Middle');
+set([haddpatternbtn,hrmpatternbtn,hrectbutton],'FontUnits','normalized');
 % ====================================================================
 
 % ================= BEAD DETECTION METHODS ===========================
@@ -204,15 +210,16 @@ hbeadmethods = uipanel('Parent', hfig, 'Title', 'Bead tracking', 'Units', 'norma
             'Position', [0.56, 0.05, 0.1, 0.24],'Visible','off');
 hbeadinilist = uicontrol('Parent', hbeadmethods, 'Style', 'popup', 'String', {'no data'},...
             'Units', 'normalized', 'Position', [0,0.3,1, 0.25],'FontUnits','normalized', 'Callback', {@pickbead_callback});
-hpoitbtn = uicontrol('Parent', hbeadmethods, 'Style', 'pushbutton', 'Units', 'normalized',...
-            'Position', [0,0.15,0.5,0.15],'FontUnits','normalized', 'Interruptible', 'off','BusyAction','cancel', ...
+hpointbtn = uicontrol('Parent', hbeadmethods, 'Style', 'pushbutton', 'Units', 'normalized',...
+            'Position', [0,0.15,0.5,0.15], 'Interruptible', 'off','BusyAction','cancel', ...
             'String', 'Select', 'Callback', {@getpoint_callback, 'list'});
 hbeadcoortxt = uicontrol('Parent', hbeadmethods, 'Style', 'text' , 'String', {'[.,.;,]'},...
             'Units', 'normalized', 'Position', [0.5,0.15,0.5,0.15],'FontUnits','normalized');
 haddbeadbtn = uicontrol('Parent', hbeadmethods, 'Style', 'pushbutton', 'Units','normalized',...
-            'Position', [0,0,0.5,0.15],'FontUnits','normalized', 'String', 'Add', 'Callback', {@addbead_callback});
+            'Position', [0,0,0.5,0.15], 'String', 'Add', 'Callback', {@addbead_callback});
 hrmbeadbtn = uicontrol('Parent', hbeadmethods, 'Style', 'pushbutton', 'Units','normalized',...
-            'Position', [0.5,0,0.5,0.15],'FontUnits','normalized', 'String', 'Remove', 'Callback', {@rmbead_callback});  
+            'Position', [0.5,0,0.5,0.15],'String', 'Remove', 'Callback', {@rmbead_callback});  
+set([hpointbtn,haddbeadbtn,hrmbeadbtn], 'FontUnits','normalized');        
 % ====================================================================
 
 % ================= PIPETTE DETECTION SETTINGS =======================
@@ -1172,8 +1179,10 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
        
     % set the range for plot
     function plotrange_callback(source,~,oldval,var)
-       lowplot = round(str2double(hlowplot.String));
+       lowplot = round(str2double(hlowplot.String));            % save the values
        highplot = round(str2double(hhighplot.String));
+       hlowplot.Callback  = {@plotrange_callback,lowplot,1};    % reset old values in callback
+       hhighplot.Callback = {@plotrange_callback,highplot,2};
        % revert for incorrect input
        if (isnan(lowplot)||isnan(highplot)||lowplot > highplot||lowplot < 1||highplot > vidObj.Frames) 
            warndlg({'Input values must be numeric, positive, low value smaller than high value';
@@ -1221,7 +1230,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             case 4  % force
                 BFPobj.plotTracks(hgraph,lowplot,highplot,false,false,'Style','F');
                 thisRange = [lowplot, highplot];
-                hzeroline = plot(hgraph,BFPobj.minFrame:BFPobj.maxFrame,zeros(1,BFPobj.maxFrame-BFPobj.minFrame+1),...
+                hzeroline = plot(hgraph,lowplot:highplot,zeros(1,highplot-lowplot+1),...
                      '--r','LineWidth',2,'HitTest','off');
                 pushtxt = text(hgraph.XLim(2),0,'Pushing','Parent',hgraph,'FontUnits','normalized',...
                     'HorizontalAlignment','right', 'VerticalAlignment','top','Color','red',...
@@ -1324,7 +1333,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         
         % check if initial frame of the interval is frame of origin of the
         % pipette pattern. This test is important to clarify, if the
-        % pipette patter selected mathech the pattern of the interval
+        % pipette patter selected matches the pattern of the interval
         if ( interval.frames(1) ~= tmppatframe && interval.frames(1) ~= updpatframe)
             initrackdlg = warndlg({'Selected pipette pattern does not originate at the first frame of the proposed interval';...
                      'Program will attempt to search the pattern in the frame, to verify its contrast compatibility and autoset the initial coordinates for search in this interval.'},...
@@ -1447,7 +1456,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             if review; return; end; % after overlaps are sorted out, let user review
         end
     
-        % verify reference point is part of interval being added; in
+        % verify reference frame is part of the interval being added; in
         % case reference is external, issue contrast change risk warning;
         % the pipette must be local for this interval
         if ( interval.reference >= interval.frames(1) && interval.reference <= interval.frames(2) ) && ...
@@ -1666,7 +1675,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         interval.patcoor = patternlist(val).coor;
         interval.patsubcoor  = patternlist(val).anchor;        
         interval.reference = getreference(tmppatframe);
-        hrefframe.String = interval.reference;
+        hrefframe.String = num2str(interval.reference);
         hpatsubcoor.String = strcat('[',num2str(round(interval.patsubcoor(1))),','...
                             ,num2str(round(interval.patsubcoor(2))),']');
         hpatternint.String = strcat('[',num2str(round(interval.patcoor(1))),',',num2str(round(interval.patcoor(2))),...
@@ -1994,7 +2003,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         
         % check if there's no other selection under way
         if selecting
-            warning(selectWrng);
+            warn('select');
             return;
         else
             selecting = true;
@@ -2047,7 +2056,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         
         % check if no other selection process is running
         if selecting
-            warning(selectWrng);
+            warn('select');
             return;
         else
             selecting = true;
@@ -2072,7 +2081,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                 tmppatframe = pattern.frame;
                 interval.reference = getreference(pattern.frame);
                 interval.patsubcoor = pattern.anchor;
-                hrefframe.String = interval.reference;
+                hrefframe.String = num2str(interval.reference);
                 hpatternint.String = strcat('[',num2str(round(interval.patcoor(1))),',',num2str(round(interval.patcoor(2))),...
                                         ';',num2str(tmppatframe),']');
                 hpatsubcoor.String = strcat('[',num2str(round(interval.patsubcoor(1))),','...
@@ -2514,7 +2523,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     end
     
     % searches original reference frame selected for the interval of origin
-    % origframe: frame of origin of the pipette pattern
+    % origframe: the pipette pattern
     function [rframe] = getreference(orgiframe)
         rframe = 0;     % return zero, if original reference cannot be found
         if numel(intervallist) > 0        
@@ -2655,7 +2664,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         % construct the string
         switch type
             case 'select'
-                str = selectWrng;
+                str = 'Another selection process is currently running. Finish the former and try again.';
                 name = 'Concurrent selection';
             case 'interrupt'
                 str = strjoin({'Selection process was interrupted by another action.',...

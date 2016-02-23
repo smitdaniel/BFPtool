@@ -1,7 +1,15 @@
+%   This class is just a small wrapper to allow for using the same
+%   getters and setters for video objects working with Tiff format
+%   (libTiff) and other video formats (videoReader)
+%   IN:
+%   videopath   : constructor takes the full path to the videofile
+%   DETAIL :
+%   The wrapper determines the type of the file, and populates the
+%   information about the video in the 'Video information' panel in the
+%   BFPGUI. It provides (and calculates) frame-by-frame contrast on demand.
+%   ================================================================
+
 classdef vidWrap < handle
-% this class is just a small wrapper to allow for using the same
-% getters and setters for video objects working with Tiff format
-% (libTiff) and other video formats (videoReader)
 
     properties
         

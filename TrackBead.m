@@ -1,11 +1,36 @@
-function [ centres, radii, metrics, badFrames ] = TrackBead( vidObj, contrast, inicoor, varargin )
 %TrackBead Uses matlab function do detect dark or bright circles
+%   IN:
 %   vidObj  : object wrapping the video file
 %   contrast: contrast of the bead, either dark or bright
 %   inicoor : initial coordinate of the bead
+%   varargin may contain the following:
 %   range   : the frame range to search for the bead
 %   radius  : range of radii of the bead
+%   buffer  : number of frames of failed detection before aborting
+%   sensitivity : sensitivity of the method
+%   edge    : edge sensitivity of the method
+%   side    : half-side of a box shaper area around last valid detection
+%             to search for the bead in the following frame
+%   robustness  : how bad can bead metric be
+%   imagequality: how bad can image be
+%   review  : number of frames averaged to get info about metric and contr.
+%   retries : number of retries for one frame (w/ relaxed conditions)
+%   OUT:
+%   centres : centres of the detected bead, one centre per frame
+%   radii   : radius for each frame of detection
+%   metrics : detection strength of each frame
+%   badFrames   : frames, where detection failed - surrogative value used
+%   DETAIL:
+%   The method uses Matlab IP TB method 'imfindcircles' to detect circular
+%   objects (here the particular bead of interest), taking into account the
+%   spatial distance of the object between consecutive detections. The
+%   method uses both algorithms offered by 'imfindcircles' and chooses the
+%   best outcome (based on metrics). If the bead is not selected, it
+%   retries the selection with relaxed conditions several times. If the
+%   metrics or the contrast are poor, it issues warning.
 %   ===============================================================
+
+function [ centres, radii, metrics, badFrames ] = TrackBead( vidObj, contrast, inicoor, varargin )
 
 inp = inputParser;  
 defaultRange        = -1;           % range of frames to analyze

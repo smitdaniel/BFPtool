@@ -1,12 +1,27 @@
-function [ position, scores, badFrames ] = TrackPipette( vidObj, pipette, varargin )
 %TrackPipette Finds a pipette pattern in a frame
-%   vidPath: points to the recorded video file
-%   pattern: the pattern of the pipette tip to be tracked
-%   inicoor: initial coordinate to start the tracking
-%   range  : the range of analyzed frames
-%   calculates normalized cross correlation of pipette and any possible 
-%   submatrix of the field; returns the one with the smallest distance
+%   IN:
+%   vidObj  : object wrapping the video file
+%   pipette : pattern of the pippete tip to be tracked
+%   inicoor : initial coordinate to start the tracking
+%   range   : the range of frames to analyse
+%   review  : number of frames used for robustness analysis
+%   robustness : threshold for poor correlation warnings
+%   quality : threshold for poor contrast warnings
+%   wideField  : switch for unrestricted search in the whole field
+%   buffer  : number of failed consecutive frame searches before aborting
+%   OUT:
+%   position   : array of pipette positions for each frame
+%   scores     : array of cross-correlation values for each frame
+%   badFrames  : list of frames of failed detection
+%   DETAIL:
+%   Calculates normalized cross correlation of pipette and any possible 
+%   submatrix of the field. The returned position is calculated using
+%   elliptical paraboloid fit to the scores matrix and choosing the
+%   extremal point - this allows to obtain sub-pixel precision. The program
+%   issues warnings if the detection or contrast underperform. 
 %   ====================================================================
+
+function [ position, scores, badFrames ] = TrackPipette( vidObj, pipette, varargin )
 
 % parse the input; in case initial coordinate and range are not provided,
 % continue by taking the whole range and search the whole field.
@@ -80,9 +95,9 @@ scores = zeros(size(position,1),1);      % the match metric of the pattern for e
 badFrames = false(size(position,1),1);
 frames = 1;     % framecounter
 failures = 0;   % failed detections
-choice = 'report';
+choice = 'report';  % switch for warning dialogues
 
-% analyse the segment
+% analyse the interval of frames defined by 'range' parameter
 while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range(2)) )  % while there's another frame to read and range continues
     
     thisFrame = range(1)-1+frames;
@@ -93,7 +108,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range
     score = score( pipDim(1):end - pipDim(1) + 1, pipDim(2):end - pipDim(2) + 1);   % clip for only unpadded correlations
     % here score(1,1) is identical pixel to the pixel denoted by numbers in box(1,1)
     
-    % check the quality of contrast to determine further refinements
+    % check the quality of contrast over 'review' window to determine further refinements
     contrastTest = mean(contrast(max(thisFrame-review,range(1)):thisFrame));   
     
     [index(1),index(2)] = (find( score==max(score(:)),1));    % find the index of the maximum [row,column]
@@ -278,7 +293,7 @@ end;    % end for the while cycle of the interval
             warndlg(strjoin({'Method attempts to improve detection by trying to erode or dilate the',...
                 'pipette pattern. It was, however, impossible to precisely localize the pattern at the',...
                 'first frame, frame',num2str(range(1)),', of the analyzed interval. With correlation',...
-                num2str(wfMet),'not meeting the required strength of',num2str(deafultStrongRobust),...
+                num2str(wfMet),'not meeting the required strength of',num2str(defaultStrongRobust),...
                 'Program will continue without the feature. You can try to resolve the problem by',...
                 'relaxing the strength requirement, or choosing another pattern.'}));
             return;

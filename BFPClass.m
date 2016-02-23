@@ -1,6 +1,13 @@
-classdef BFPClass < handle
     %BFP Holds data and methods for BFP experiment analysis
-    %   Detailed explanation goes here
+    %   This class saves settings and results of the analysis of BFP
+    %   experiments. It contains methods to operate in discontiguous
+    %   interval landscape, sub-call TrackBead and TrackPipette methods
+    %   with appropriate settings, generate graphs (taking a handle) of
+    %   data, calculate stiffness and corresponding time evolution of
+    %   force, import data and generate fidelity report
+    %   ===============================================================
+
+classdef BFPClass < handle
     
     properties
         
@@ -49,6 +56,7 @@ classdef BFPClass < handle
         
     end
 
+    % rather technical parameters; might be fine-tuned across platforms
     properties (Constant)
        labelfontsize = 0.05;    % font size for legend, axes etc. 
        reportfontsize = 0.04;   % font size for a report pop-up window 
