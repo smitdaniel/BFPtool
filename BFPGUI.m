@@ -92,7 +92,7 @@ P2M = 0.1024;       % pixels to microns coefficient
 stiffness = 200;    % RBC stiffness, in pN/micron
 
 % tracking data
-intfields = { 'pattern', 'patcoor', 'beadcoor', 'patsubcoor', 'contrast','reference' };
+intfields = { 'pattern', 'patcoor', 'beadcoor', 'patsubcoor', 'contrast','reference','frames' };
 colnames = {'Range|Start', 'Range|End', 'Bead|X-coor', 'Bead|Y-coor', 'Pipette|X-coor', 'Pipette|Y-coor', 'Anchor|X-coor', 'Anchor|Y-coor', 'Remove'};
 colformat = {'numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','logical'};
 tmpbeadframe = [];  % stores value of current bead frame selected for the interval
@@ -102,6 +102,7 @@ intervallist = [];  % list of tracking intervals with settings
 BFPobj = [];        % BFPClass object containing the calculation/tracking
 remove = [];        % list of interval entries to remove from the complete list
 updpatframe = 0;    % pipette pattern originating frame, updated during addition process
+calibint = [];      % single-frame interval in case a calibration frame needs to be set up
 
 % plotting and fitting settings
 lowplot = 1;        % lower bound of plotted data
@@ -1482,33 +1483,82 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             uiwait(hw);
         end;
         
-        % compare the reference used with the reference at the interval of
-        % origin of the pipette pattern
+        % compare the reference and anchor used with the data at the 
+        % intervals already added. If one pattern with two different
+        % settings was forced into the list, the result will be a horrible
+        % mess I do not want to fix. This is not GTA to give people insane
+        % stunt bonus.
         if ~passed
-            rframe = (getreference(tmppatframe));
-            if (rframe == interval.reference);  % let pass                
+             [ rframe, ranchor,~ ] = ...  % validate; as validation is with confirmation, suppress warning message (the last passed variable)
+                 validatepattern(interval.pattern,interval.reference,interval.patsubcoor,true);
+ 
+            if (rframe == interval.reference) && all(ranchor == interval.patsubcoor);  % let pass                
             else
-                choice = questdlg(strjoin({'The reference frame (i.e. zero-strain frame) You chose,',num2str(interval.reference),',is different from the reference frame',...
-                    'of original interval of the pattern,', num2str(rframe),'. This may be a false warning, but please make sure,',...
-                    'that the pattern and the reference distance are compatible over the two intervals, in order to get compatible force readings.'}),...
-                    'Reference incompatibility between intervals','Keep','Review','Keep');
+                if (rframe ~= interval.reference)
+                    strref = strjoin({'The reference frame (i.e. zero-strain frame) You chose,',...
+                    num2str(interval.reference),',is different from the reference frame',...
+                    'previously chosen for the identical pipette pattern,', num2str(rframe),'.'});
+                else
+                    strref = '';
+                end
+                if any(ranchor ~= interval.patsubcoor)
+                    stranch = strjoin({'The anchor point You chose,'...
+                    strcat('[',num2str(round(interval.patsubcoor(1))),',',num2str(round(interval.patsubcoor(2))),']'),...
+                    ',is different from the anchor point previously chosen for the identical pipette pattern,',...
+                    strcat('[',num2str(round(ranchor(1))),',',num2str(round(ranchor(2))),'].')});
+                else
+                    stranch = '';
+                end
+             
+                choice = questdlg(strjoin({strref,char(10), stranch,char(10),...
+                    'This may be a false warning, but please make sure,',...
+                    'that the pattern, reference frame and anchor are compatible over the intervals,',...
+                    'in order to get compatible force readings.'}),...
+                    'Incompatibility between intervals','Keep current','Review','Use previous','Keep current');
                 switch choice
-                    case 'Keep';    % let pass
+                    case 'Keep current';    % let pass
+                    case 'Use previous';
+                        interval.reference  = rframe;
+                        interval.patsubcoor = ranchor;
                     case 'Review'
                         return;
                 end
             end
         end
         
-        % finally, if reference frame be not part of analysis, abort
-        if ~(logical(getreference(interval.reference))) &&...
+        % finally, if reference frame be not part of any analysed interval,
+        % add the calibration frame as a single-frame interval, before
+        % proceeding with the major addition of user defined interval
+        [ ~,~, absent ] = (validatepattern(interval.pattern,interval.reference,interval.patsubcoor,true));
+        if absent && ... % if the pattern is absent in other intervals and also in the currently added
            (interval.reference < interval.frames(1) || interval.reference > interval.frames(2));
-            warndlg(strcat('Selected reference (zero strain) frame, ', num2str(interval.reference),...
-                ', does not belong to any present interval, neither to interval being added. ',...
-                'Please select a reference point, which is part of tracking.',...
-                'The adding will abort.'),...
-                'Unaccessible reference point', 'replace');
-            return;
+       
+            oldframe = vidObj.CurrentFrame;
+       
+            calibint = [];
+            calibint = strucopy(calibint,interval); % pattern, patsubcoor, reference are preserved
+            calibint.frames = [interval.reference,interval.reference];
+            calibint.beadcoor = [];
+            calibint.contrast = [];
+
+            hcalibfig = buildCalibFig();    % call function to construct single-frame calibration figure
+            
+            waitfor(hcalibfig);
+            
+            setframe(oldframe);
+            
+            if ~isempty(calibint.beadcoor) && ~isempty(calibint.contrast)
+                intervallist = strucopy(intervallist,calibint);
+                warn('Calibration single-frame interval was successfully added.');
+            else
+                warndlg(strcat('Selected reference (zero strain) frame, ', num2str(interval.reference),...
+                    ', does not belong to any present interval, neither to interval being added. ',...
+                    'Please select a reference point, which is part of tracking.',...
+                    'The adding will abort.'),...
+                    'Unaccessible reference point', 'replace');
+                return;
+            end
+            
         end
         
         % if all checks are passed, add interval to the list and report to
@@ -1672,9 +1722,9 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         pattern = patternlist(val);         % set last added pattern 
         tmppatframe = patternlist(val).frame;
         interval.pattern = patternlist(val).cdata;
-        interval.patcoor = patternlist(val).coor;
-        interval.patsubcoor  = patternlist(val).anchor;        
-        interval.reference = getreference(tmppatframe);
+        interval.patcoor = patternlist(val).coor;      
+        [interval.reference, interval.patsubcoor,~] = ...
+            validatepattern(patternlist(val).cdata, tmppatframe, patternlist(val).anchor);
         hrefframe.String = num2str(interval.reference);
         hpatsubcoor.String = strcat('[',num2str(round(interval.patsubcoor(1))),','...
                             ,num2str(round(interval.patsubcoor(2))),']');
@@ -1702,10 +1752,14 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         end;
     end
 
-    % get reference frame from the current frame
+    % get reference frame for the currentlu selected pattern
     function getrefframe_callback(~,~)
-        interval.reference = getreference(tmppatframe);
+        if isempty(interval.pattern); return; end;
+        [interval.reference, interval.patsubcoor,~] = ...     % validate the pattern
+            validatepattern(interval.pattern, interval.reference, interval.patsubcoor);
         hrefframe.String = num2str(interval.reference);
+        hpatsubcoor.String = strcat('[',num2str(round(interval.patsubcoor(1))),','...
+                                ,num2str(round(interval.patsubcoor(2))),']');
     end
 
     % set reference frame, where the RBC is not strained
@@ -2009,7 +2063,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
             selecting = true;
         end
             
-        [bead,pass] = getBead(source,srctag);  % call method to detect bead
+        [bead,pass,~] = getBead(source,srctag);  % call method to detect bead
         
         % if detection fails (reject or error), old 'bead' value is returned
         % if old value is empty, stop here, do not change anything
@@ -2079,8 +2133,8 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                 interval.pattern = pattern.cdata;
                 interval.patcoor = pattern.coor;
                 tmppatframe = pattern.frame;
-                interval.reference = getreference(pattern.frame);
-                interval.patsubcoor = pattern.anchor;
+                [interval.reference,interval.patsubcoor,~] = ...  % validate if the array is not already present
+                    validatepattern(pattern.cdata,pattern.frame,pattern.anchor);
                 hrefframe.String = num2str(interval.reference);
                 hpatternint.String = strcat('[',num2str(round(interval.patcoor(1))),',',num2str(round(interval.patcoor(2))),...
                                         ';',num2str(tmppatframe),']');
@@ -2381,20 +2435,40 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
     end
 
     % detect and return bead information
-    function [ beadinfo,pass ] = getBead( source,tag )
+    function [ beadinfo,pass,rad ] = getBead( source,tag, varargin )
+        
+        inpar = inputParser;
+        defaultAxHandle = haxes;
+        defaultFrame    = vidObj.CurrentFrame;
+        defaultCallback = @getpoint_callback;
+        
+        inpar.addRequired('source');
+        inpar.addRequired('tag');
+        inpar.addParameter('hax', defaultAxHandle, @isgraphics);
+        inpar.addParameter('frm', defaultFrame, @isfloat);
+        inpar.addParameter('cbk', defaultCallback );
+        
+        inpar.parse(source,tag,varargin{:});
+        
+        source = inpar.Results.source;
+        tag = inpar.Results.tag;
+        hax = inpar.Results.hax;
+        frm = round(inpar.Results.frm);
+        cbk = inpar.Results.cbk;
+        % =============================================================
         
         beadinfo = struct('coor',[],'frame',[],'contrast',[]);
         % intial section, set boundary, select point, change UI, wait for
         % confirmation of the selection
-        BCfunction = makeConstrainToRectFcn('impoint',get(haxes,'XLim'),get(haxes,'YLim'));
-        beadpoint = impoint(haxes,'PositionConstraintFcn',BCfunction);
+        BCfunction = makeConstrainToRectFcn('impoint',get(hax,'XLim'),get(hax,'YLim'));
+        beadpoint = impoint(hax,'PositionConstraintFcn',BCfunction);
         source.String = 'Confirm';
         source.Callback = 'uiresume(gcbf)';
         uiwait(gcf);
         
          try
             beadinfo.coor = beadpoint.getPosition;
-            beadinfo.frame= round(vidObj.CurrentFrame);
+            beadinfo.frame= round(frm);
             choice = questdlg('Select bead contrast. For a bead darker than background, select ''Dark'', and visa versa.',...
                 'Bead contrast','Bright','Dark','Dark');
             switch choice
@@ -2413,7 +2487,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                     'and choosing the appropriate contrast. Search will now abort.'}),'No bead detected','replace');
                 pass = false;
                 source.String = 'Select';
-                source.Callback = {@getpoint_callback,tag};
+                source.Callback = {cbk,tag};
                 return;     % kill the procedure
             end
                 
@@ -2423,7 +2497,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
                     'and detection failures can occur.'}));
             end;
                 
-            hcirc = viscircles(haxes,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot the detected bead
+            hcirc = viscircles(hax,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot the detected bead
             choice = questdlg('Was the bead detected correctly?','Confirm selection','Accept','Reject','Accept');
             switch choice
                 case 'Accept'   % precise the coordinate
@@ -2444,7 +2518,7 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         end
         
         source.String = 'Select';
-        source.Callback = {@getpoint_callback,tag};                     
+        source.Callback = {cbk,tag};                     
                      
     end
 
@@ -2522,19 +2596,44 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         end
     end
     
-    % searches original reference frame selected for the interval of origin
-    % origframe: the pipette pattern
-    function [rframe] = getreference(orgiframe)
-        rframe = 0;     % return zero, if original reference cannot be found
+    % search if the current pattern is already present in the list and user
+    % appropriate reference frame and anchor, if it is
+    % in: pattern: the image array; patframe: the frame of origin of image,
+    % anchor: selected anchor of the image pattern
+    function [rframe,ranchor,absent] = validatepattern(pattern,patframe,anchor,nowarn)
+        if ~exist('nowarn','var'); nowarn = false; end;
+        rframe  = patframe;     % return zero, if original reference cannot be found
+        ranchor = anchor;
+        absent  = true;
         if numel(intervallist) > 0        
             for i=1:numel(intervallist)
-                if orgiframe >= intervallist(i).frames(1) && orgiframe <= intervallist(i).frames(2)
-                    rframe  = intervallist(i).reference;        % this is the reference distance
+                if isequaln(pattern, intervallist(i).pattern)
+                    if (rframe == intervallist(i).reference) && all(ranchor == intervallist(i).patsubcoor)
+                        if ~nowarn
+                            warn(strjoin({'The pattern was recognised in another interval,',...
+                                'all settings comply.'}));
+                        end
+                    else
+                        rframe   = intervallist(i).reference;    % this is the reference distance frame
+                        ranchor  = intervallist(i).patsubcoor;   % this is the anchor for the given pattern
+                        if ~nowarn
+                            warn(strjoin({'The pattern was found in another present interval',...
+                                'and reference frame and anchor point were updated accordingly.',char(10),...
+                                strcat('Reference frame reset to:',num2str(rframe)),char(10),...
+                                strcat('Anchor point reset to:[',...
+                                num2str(round(ranchor(1))),',',num2str(round(ranchor(2))),']'),char(10),...
+                                'You can change this manually, in the interval selection panel.'}));
+                        end
+                    end
+                    absent = false;
                     break;
+                else
+                    absent = true;
+                    % old values are returned, if pattern is not found
                 end
             end
         else
-            rframe = vidObj.CurrentFrame;   % if this is the first interval, use current frame
+            % do nothing
         end
     end
 
@@ -2686,6 +2785,131 @@ set([hvar,htar,hexport,himport,hverbose,hhideexp,hhidelist,hhidedet],'FontUnits'
         else
             warning(str);
         end            
+        
+    end
+
+%   ====================================================================
+%   ============== SINGLE-FRAME CALIBRATION FUNCTIONS ==================    
+%   The single frame calibration is necessary, if the reference distance
+%   frame (i.e. the frame, where the bead and the RBC just touch, with zero
+%   load incurred on the bead) is not part of any tracked interval. Then,
+%   the program attempts to semi-automatically create and add single-frame
+%   interval. User only needs to verify the pipette pattern was well
+%   matched and select the appropriate bead (in case more beads are
+%   present).
+
+    % constructs the calibration figure, uicontrols etc.
+    function [hcalibfig]= buildCalibFig()
+        
+        % build the controls
+        titstr = strjoin({'Calibration single-frame interval - frame',num2str(calibint.reference)});
+        hcalibfig   = figure('Name', titstr,'Units', 'normalized','WindowStyle','modal',...
+            'OuterPosition', [0.2,0.2,0.6,0.6], 'Visible', 'on', 'Selected', 'on',...
+            'CloseRequestFcn',{@calibfigCleanup_closereq});
+        hcalibax    = axes('Parent',hcalibfig,'Units','normalized', 'Position', [0,0.3,1,0.6],...
+         'FontUnits','normalized');
+        hrejectpip  = uicontrol('Parent', hcalibfig,'Style','pushbutton', ...
+         'Units', 'normalized', 'Position', [0.05,0.1,0.2,0.1],'FontUnits','normalized',...
+         'TooltipString','Reject pipette detection and close the window',...
+         'String', '<HTML><center> Reject <br> Pipette </HTML>','Interruptible','on',...
+         'Callback', {@rejectpipette_callback}); 
+        hgetbeadbtn = uicontrol('Parent', hcalibfig,'Style','pushbutton', ...
+         'Units', 'normalized', 'Position', [0.3,0.1,0.2,0.1],'FontUnits','normalized',...
+         'TooltipString','Define the bead for the distance calibration',...
+         'String', 'Get Bead','Interruptible','on', ...
+         'Callback', {@getcalibead_callback,hcalibax,calibint.reference});
+        hfinishbtn  = uicontrol('Parent', hcalibfig,'Style','pushbutton', ...
+         'Units', 'normalized', 'Position', [0.55,0.1,0.2,0.1],'FontUnits','normalized',...
+         'TooltipString','Accept calibration, return data to main function, and close this window',...
+         'String', 'Finish','Interruptible','on', 'Callback', {@acceptcalib_callback});
+        hcancelbtn  = uicontrol('Parent', hcalibfig,'Style','pushbutton', ...
+         'Units', 'normalized', 'Position', [0.8,0.1,0.15,0.1],'FontUnits','normalized',...
+         'TooltipString','Close the window, discard changes, and abort interval addition',...
+         'String', 'Cancel','Interruptible','on', 'Callback', {@calibfigCleanup_closereq});
+
+        % read the frame
+        oldframe = vidObj.CurrentFrame;
+        calibframe = vidObj.readFrame(calibint.reference);
+        vidObj.readFrame(oldframe);   % resets the original frame number in the main figure
+        imagesc(calibframe.cdata, 'Parent', hcalibax);
+        colormap(gray);        
+        axis(hcalibax, 'image');        % set limits of the canvas to 'image'
+        
+        % detect and display the pattern in this frame
+        [ position, ~ ] = TrackPipette( vidObj, calibint.pattern, [-1 -1],...
+            [calibint.frames(1) calibint.frames(2)], 'wideField',true );
+        calibint.patcoor = [ position(2), position(1) ];
+        hold(hcalibax,'on');
+        rectangle('Parent', hcalibax, 'Position', ...
+            [position(2), position(1), size(interval.pattern,2), size(interval.pattern,1)],...
+            'EdgeColor','r','LineWidth', 2 );
+        hold(hcalibax,'off');
+              
+        
+    end
+
+    % verifies the data and closes the calibration window
+    function acceptcalib_callback(~,~)
+        if ~isempty(calibint.beadcoor) && ~isempty(calibint.contrast);
+            disp('All necessary data were measured, returning to the main window');
+            delete(gcf);
+        else
+            warn(strjoin({'Bead was not properly selected. Please make sure the appropriate bead'...
+                'is chosen and appears delineated on the image.'}),'Calibration not finished','modal');
+            return;
+        end
+    end
+
+    % allows user to select the appropriate bead
+    function getcalibead_callback(source,~,hax,frm)
+        persistent hviscirc;
+        if isgraphics(hviscirc); hviscirc.Visible = 'off'; end;     % hide the circle
+        
+        tag = 'interval';
+        [ beadinfo, pass, rad ] = getBead( source, tag, 'hax', hax, 'frm', frm );
+        source.Callback = {@getcalibead_callback,hax,frm};  % reset the callback changed in getBead method
+        source.String   = 'Get Bead';
+        
+        if pass
+            calibint.beadcoor = beadinfo.coor;
+            calibint.contrast = beadinfo.contrast;
+            hviscirc = viscircles(hax,beadinfo.coor,rad,'EdgeColor','r');
+        else
+            warn(strjoin({'Bead detection was unsuccessful, please try again.',...
+                'Previos detection result, if any, was reverted.',...
+                'If the problems continue, please try to change Your calibration frame.'}));
+        end
+
+        if isgraphics(hviscirc); hviscirc.Visible = 'on'; end;      % show the circle
+    end
+
+    % reject automatically detected pipette and abort the single-frame calibration
+    function rejectpipette_callback(~,~)
+        hw = warndlg(strjoin({'The incorrect detection of the pipette pattern in the calibration frame',...
+            'means, the pattern is not transferable and another reference frame must be chosen, or',...
+            'the pipette pattern tentatively expanded. The adding will abort and return to the main',...
+            'window.'}),'Pipette pattern detection rejected','modal');
+        uiwait(hw);
+        calibint = [];  % discard data
+        delete(gcf);    % close calibration window
+    end
+
+    % callback after close request of calibration figure
+    function calibfigCleanup_closereq(~,~)
+        
+        choice = questdlg(strjoin({'You are about to cancel the calibration interval window.',...
+            'If You continue, currently collected calibration data will be discarded.',...
+            'The adding of an interval will be aborted and another form of calibration',...
+            'will have to be set up. Are You sure You want to quit?'}),...
+            'Quit outstanding calibration','Quit and abort','Continue','Continue');
+        
+        switch choice
+            case 'Quit and abort'
+                calibint = [];  % clear calibration interval data
+                delete(gcf);
+            case 'Continue'
+                return
+        end
         
     end
 
