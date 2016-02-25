@@ -73,21 +73,24 @@ classdef BFPClass < handle
             else
                 intlist = varargin{3};
             
-                obj.minFrame = 1;
                 obj.tracked = false;                % no tracking done when object is created
                 obj.trackedFrames = 0;
                 obj.name = varargin{1};             % set calc obj name
                 obj.vidObj = varargin{2};           % set video object handle (access the video)
                 obj.maxFrame = 1;
+                obj.minFrame = obj.vidObj.Frames;   % number of frames in the video
                 fields = fieldnames(intlist(1));
                 inters = numel(intlist);
                 for int=1:inters                    % copy the list of intervals in the video to analyze
                     for nam=1:numel(fields)
                        obj.intervallist(int).(fields{nam}) = intlist(int).(fields{nam});
                     end
-                    obj.minFrame = min(obj.intervallist(int).frames(1), obj.minFrame);
+                    if (obj.intervallist(int).frames(1)~=obj.intervallist(int).frames(2))   % ignore one frame intervals
+                        obj.minFrame = min(obj.intervallist(int).frames(1), obj.minFrame);
+                    end
                     obj.maxFrame = max(obj.intervallist(int).frames(2), obj.maxFrame);
                 end
+                if obj.minFrame > obj.maxFrame; obj.minFrame = obj.maxFrame; end;   % if only single frame intervals are present (which is unlikely)
             end
         end
         
@@ -147,7 +150,7 @@ classdef BFPClass < handle
                 obj.trackedFrames = obj.trackedFrames + ...
                                    (obj.intervallist(int).frames(2)-obj.intervallist(int).frames(1)+1);
             end
-            obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','3D');          % plot the tracking data
+            obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');          % plot the tracking data
             obj.tracked = true;             % set 'tracked' flag
             obj.generateReport();
         end
@@ -553,16 +556,18 @@ classdef BFPClass < handle
         function [ ] = generateReport(obj)
             intervalstr = 'Intervals of uncertainty:\n\n';
             hrepfig = figure;
-            hrepax = axes('Parent',hrepfig,'Units','normalized','OuterPosition',[0,0,0.7,1],'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+            hrepax = axes('Parent',hrepfig,'Units','normalized','OuterPosition',[0,0,0.7,1],...
+                        'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
             hold(hrepax,'on');
+            obj.plotTracks( hrepax, obj.minFrame, obj.maxFrame, true,true,'Style','M');
+            set(hrepax, 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+            xlabel( hrepax, 'Time [frames]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+            ylabel( hrepax, 'Metric [r.u.]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+            title( hrepax, 'Detection metrics', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+            
             for int=1:numel(obj.intervallist)
                 ffrm = obj.intervallist(int).frames(1);
-                lfrm = obj.intervallist(int).frames(2);
-                obj.plotTracks( hrepax, ffrm, lfrm, true,true,'Style','M');
-                set(hrepax, 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
-                xlabel( hrepax, 'Time [frames]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
-                ylabel( hrepax, 'Contrast [r.u.]', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
-                title( hrepax, 'Detection metrics', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
+                %lfrm = obj.intervallist(int).frames(2);
                 ffrm = ffrm-1;
                 hold(hrepax,'on');
                 badBeads = fillHoles(obj.beadPositions(int).bads);
@@ -571,7 +576,7 @@ classdef BFPClass < handle
                 platPlot(badBeads,obj.metric,'r');
                 platPlot(badPips,obj.correlation,'b');
                 for bu=1:size(badUni,1)
-                    intervalstr = sprintf(strcat(intervalstr,'[',num2str(badUni(bu,1)),':',num2str(badUni(bu,2)),']\n'));
+                    intervalstr = sprintf(strcat(intervalstr,'\n','[',num2str(badUni(bu,1)),':',num2str(badUni(bu,2)),']'));
                 end
             end
             
@@ -600,7 +605,7 @@ classdef BFPClass < handle
                 'Style','text', 'String', intervalstr,'HorizontalAlignment','left',...
                 'FontWeight','bold','TooltipString','Unified intervals of bad frames of tracking the bead and the pipette');
             
-            % plots plateaus of bad bead an pipette frames
+            % plots plateaus of bad bead and pipette frames
             function [] = platPlot(bads,thresh,colour)
                 for b=1:size(bads,1)
                     plot(hrepax, ffrm+bads(b,1):ffrm+bads(b,2), thresh*ones(1,bads(b,2)-bads(b,1)+1),strcat('-',colour),'LineWidth',2 );
@@ -696,7 +701,7 @@ end
 
 % unifies intervals in list1,list2 within scope of limits
 function [unified] = unifyIntervals(list1,list2,limits)
-    boolint = false(1,limits(2)-limits(1)+1);
+    boolint = false(limits(2)-limits(1)+1,1);
     list = [list1;list2];
     for l=1:size(list,1)
         e = list(l,:);

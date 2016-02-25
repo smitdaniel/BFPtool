@@ -29,11 +29,22 @@ classdef BFPGUIbackdoor < handle
         % video playing variables; step size for rewind and ffwd
         fastforwardFramerate = 5;
         rewindFramerate = -5;
+        % this handle allows to access small function in the GUI and change
+        % directly some of GUIs parameters, in case something breaks down;
+        % it should be used with precaution, as it is like the Ring of
+        % power, it can fix things, but break them as well, so make sure
+        % You're more like Gandalf, than Rincewind.
+        backdoorFunctionHandle;
     end
     
     methods 
-        function obj = BFPGUIbackdoor() % constructor
-            
+        function obj = BFPGUIbackdoor(backdoorFunctionHandle_) % constructor
+            obj.backdoorFunctionHandle = backdoorFunctionHandle_;   
+        end
+        
+        % sets 'selecting' variable in GUI to false
+        function resetSelecting(obj)
+            obj.backdoorFunctionHandle('reselect');
         end
         
         % testing if 'base' WS is connected to GUI

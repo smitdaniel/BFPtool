@@ -182,7 +182,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range
     centres(frames,:) = centre;      % store the bead centre coordinates [r,c] for the frame
     radii(frames,:)   = rad;
     metrics(frames,:) = metric;
-    if metric < robust - 0.2; badFrames(frames,:) = true; end;
+    if metric < robust; badFrames(frames,:) = true; end;
 
     radius = [max(floor(rad-4),radius(1)), min(ceil(rad+4),radius(2))];     % modify the radius interval (not over 18)
     box = [floor(centre - side); ceil(centre + side)];        % modify the bounding box for the next search
