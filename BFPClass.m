@@ -221,6 +221,7 @@ classdef BFPClass < handle
                     th = title(hplot, 'Force [pN]','Color','green', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     xlabel(hplot, 'time [frames]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     ylabel(hplot, 'Force [pN]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    hold on;
                 else
                     if pip && numel(obj.pipPositions) ~= 0;
                         if strcmp(style,'3D')
@@ -693,8 +694,8 @@ function [badInts] = fillHoles(badFrames)
     for int=size(badInts,1):-1:1    % prune lone standing badFrames
         if badInts(int,2)-badInts(int,1) <= 7; badInts(int,:) = [];
         else % erode dilated frames
-            badInts(int,1) = max(badInts(int,1)-3,1);
-            badInts(int,2) = min(badInts(int,2)+3,ne);
+            badInts(int,1) = max(badInts(int,1)+3,1);
+            badInts(int,2) = min(badInts(int,2)-3,ne);
         end;
     end            
 end

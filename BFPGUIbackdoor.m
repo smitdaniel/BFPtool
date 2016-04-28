@@ -42,6 +42,21 @@ classdef BFPGUIbackdoor < handle
             obj.backdoorFunctionHandle = backdoorFunctionHandle_;   
         end
         
+        % function to save only data of the object; Matlab otherwise tries
+        % to save the graphical interface as part of this object
+        function sobj = saveobj(obj)
+            sobj.edgeDetectionKernelSemiframes = obj.edgeDetectionKernelSemiframes;
+            sobj.backpassedVariable = obj.backpassedVariable;
+            sobj.contrastPlateauDetectionSensitivity = obj.contrastPlateauDetectionSensitivity;
+            sobj.contrastPlateauDetectionThreshold = obj.contrastPlateauDetectionThreshold;
+            sobj.contrastPlateauDetectionLength = obj.contrastPlateauDetectionLength;
+            sobj.contrastPlateauDetectionLimitLength = obj.contrastPlateauDetectionLimitLength;
+            sobj.contrastPlateauDetectionLimit = obj.contrastPlateauDetectionLimit;
+            sobj.fastforwardFramerate = obj.fastforwardFramerate;
+            sobj.rewindFramerate = obj.rewindFramerate;
+            %sobj.backdoorFunctionHandle = obj.backdoorFunctionHandle;
+        end
+        
         % sets 'selecting' variable in GUI to false
         function resetSelecting(obj)
             obj.backdoorFunctionHandle('reselect');
@@ -58,6 +73,7 @@ classdef BFPGUIbackdoor < handle
         end
         
     end
+
     
 end
 
