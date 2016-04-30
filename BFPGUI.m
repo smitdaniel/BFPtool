@@ -2332,13 +2332,14 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     return;     % cancel the analysis
             end
         end
-        [ contrast, ~ ] = vidObj.getContrast;    % calculates and saves in video object, if not yet calculated
         
         % if it is analysis call, take the whole domain
         if strcmp(srctag,'analysis')
             handles.lowplot = 1;                % initial frame
             handles.highplot = vidObj.Frames;   % final frame
         end
+        
+        [ contrast, ~ ] = vidObj.getContrast(handles.lowplot, handles.highplot);    % calculates and saves in video object, if not yet calculated
         
         handles.fitInt = [handles.lowplot, 0; handles.highplot, 0];  % set global fit interval
         

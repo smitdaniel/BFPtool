@@ -21,6 +21,7 @@ classdef BFPClass < handle
         trackedFrames;  % number of frames processed by the tracking method
         minFrame;       % minimal tracked frame of video
         maxFrame;       % maximal tracked frame of video
+        toBeTracked;    % number of frames to be tracked, based on imported intervallist
 
         % list of intervals in the video to track; contains all the
         % necessary information: the patterns to track, time intervals,
@@ -43,6 +44,7 @@ classdef BFPClass < handle
         sensitivity;
         edge;
         metric;
+        killTrack;  % trigger to cancel tracking
         
         % pipette tracking settings
         correlation;
@@ -66,15 +68,19 @@ classdef BFPClass < handle
         % constructor
         function obj = BFPClass(varargin)   % in order: name, vidObj, intlist
             
+            obj.killTrack = false;  % initially, do tracking
+            
             if nargin == 0  % default constructor
                 obj.name = 'default';
                 obj.tracked = false;
-                obj.trackedFrames = 0;                
+                obj.trackedFrames = 0;    
+                obj.toBeTracked = 0;
             else
                 intlist = varargin{3};
             
                 obj.tracked = false;                % no tracking done when object is created
                 obj.trackedFrames = 0;
+                obj.toBeTracked = 0;
                 obj.name = varargin{1};             % set calc obj name
                 obj.vidObj = varargin{2};           % set video object handle (access the video)
                 obj.maxFrame = 1;
@@ -89,6 +95,8 @@ classdef BFPClass < handle
                         obj.minFrame = min(obj.intervallist(int).frames(1), obj.minFrame);
                     end
                     obj.maxFrame = max(obj.intervallist(int).frames(2), obj.maxFrame);
+                    obj.toBeTracked = obj.toBeTracked + 1 + ...     % calculate the number of frames in list to process
+                                      obj.intervallist(int).frames(2) - obj.intervallist(int).frames(1);
                 end
                 if obj.minFrame > obj.maxFrame; obj.minFrame = obj.maxFrame; end;   % if only single frame intervals are present (which is unlikely)
             end
@@ -123,19 +131,25 @@ classdef BFPClass < handle
         % triggers tracking procedures; takes axes handle to plot results
         function Track(obj, hplot)
             
+            obj.killTrack = false;  % set tracking to continue
+            wbmsg = 'Tracking is about to start';   % waitbar initial message
+            htrackbar = waitbar(0,wbmsg,'Name','Tracking', 'CreateCancelBtn', ...
+                    {@canceltb_callback});  % create waitbar figure and pass it on tracking methods
             cla(hplot,'reset');
             for int = 1:numel(obj.intervallist)
+                if obj.killTrack; break; end;   % break the tracking if cancelled
                 [obj.pipPositions(int).coor, obj.pipPositions(int).metric, obj.pipPositions(int).bads] = ...
                                             TrackPipette( obj.vidObj, obj.intervallist(int).pattern,...
                                             obj.intervallist(int).patcoor,obj.intervallist(int).frames,...
                                             'robustness',obj.correlation, 'quality', obj.contrast,...
-                                            'buffer', obj.pipbuffer);
+                                            'buffer', obj.pipbuffer, 'waitbar', htrackbar);
                 [obj.beadPositions(int).coor,obj.beadPositions(int).rad,obj.beadPositions(int).metric,...
                                             obj.beadPositions(int).bads]  = ...
                                             TrackBead( obj.vidObj, obj.intervallist(int).contrast,...
                                             obj.intervallist(int).beadcoor, obj.intervallist(int).frames,...
                                             'radius', obj.radius, 'buffer', obj.buffer, 'sensitivity', obj.sensitivity,...
-                                            'edge', obj.edge, 'robustness', obj.metric, 'quality', obj.contrast);
+                                            'edge', obj.edge, 'robustness', obj.metric, 'quality', obj.contrast,...
+                                            'waitbar', htrackbar);
                 
                 % shift the detected coordinate (upper left corner) to the
                 % position of the anchor; change units from px to microns
@@ -153,6 +167,12 @@ classdef BFPClass < handle
             obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');          % plot the tracking data
             obj.tracked = true;             % set 'tracked' flag
             obj.generateReport();
+        end
+        
+        % callback to kill tracking by pressing cancel on wb
+        function canceltb_callback(~,~)
+            obj.killTrack = true;
+            delete(htrackbar);
         end
         
         % plots detected tracks; in 3D, the z-dimension is the time axis

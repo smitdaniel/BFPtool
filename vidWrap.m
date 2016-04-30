@@ -119,15 +119,29 @@ classdef vidWrap < handle
         end
         
         % calculates measure of contrast accross the frames
-        function [ contrast, meanGray ] = getContrast(obj)
+        function [ contrast, meanGray ] = getContrast(obj, ffrm, lfrm)
             
-            if isempty(obj.Contrast) || any(find(obj.Contrast==0)) % second option suggests failed previos run (i.e. contrast should never be zero)                
+            % check if the requested interval was analysed (ffrm:lfrm),
+            % redo analysis, if it wastn't, return current values otherwise
+            % (this is usually for plotting function call)
+            if isempty(obj.Contrast(ffrm:lfrm)) || any(find(obj.Contrast(ffrm:lfrm)==0)) % second option suggests failed previos run (i.e. contrast should never be zero)                
                 oldFrame = obj.CurrentFrame;
                 obj.Contrast = zeros(obj.Frames,1,'double');
                 obj.GrayLvl  = zeros(obj.Frames,1,'double');
+                warning(strjoin({'Contrast calculation for the requested interval',strcat('[',...
+                    num2str(ffrm),':', num2str(lfrm),']'),'was started before, but was not',...
+                    'finished, or the results are malformed. Contrast will be recalculated',...
+                    'for the whole video.'}));
+
                 disp('Calculating the contrast for each frame of the film');
                 
+                wbmsg = strjoin({'Calculating contrast of video of', num2str(obj.Frames),'frames'});
+                hwaitbar = waitbar(0,wbmsg,'Name','Contrast calculation', 'CreateCancelBtn', ...
+                    {@cancelwb_callback});
+                killwb = false;
                 for frm=1:obj.Frames;
+                    if killwb; break; end;
+                    waitbar(frm/obj.Frames);
                     thisFrame = obj.readFrame(frm);
                     doubleFrame = double(thisFrame.cdata);
                     obj.Contrast(frm) = std2(doubleFrame);
@@ -157,7 +171,19 @@ classdef vidWrap < handle
             
             contrast = obj.Contrast;
             meanGray = obj.GrayLvl;
+            if exist('hwaitbar','var');delete(hwaitbar); end;
+
+            % cancel function for the contrast-calculation wait bar
+            function cancelwb_callback(~,~)
+                killwb = true;
+                delete(hwaitbar);
+                disp(strjoin({'Calculation interrupted by user. Currently processed',...
+                    num2str(frm), 'frames. The data will remain accessible, padded with zeros.'}));
+            end
+            
         end
+        
+
         
         % return value of contrast at particular frame
         function [contrastfrm] = getContrastByFrame(obj,frm)

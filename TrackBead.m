@@ -32,6 +32,8 @@
 
 function [ centres, radii, metrics, badFrames ] = TrackBead( vidObj, contrast, inicoor, varargin )
 
+wbThresh = 100;                     % minimal number of frames to track to generate waitbar
+
 inp = inputParser;  
 defaultRange        = -1;           % range of frames to analyze
 defaultRadius       = [8,18];       % range of possible bead radii
@@ -43,6 +45,7 @@ defaultRobustness   = 0.8;          % level of bead metric considered too poor
 defaultImageQuality = 0.96;         % level of contrast considered too poor
 defaultReview       = 5;            % number of passed frames to calculate metric and contrast states
 defaultRetries      = 5;            % number of retries (conditions are relaxed during each retry)
+defaultWaitbar      = [];
 
 addRequired(inp,'vidObj');
 addRequired(inp,'contrast');
@@ -57,6 +60,7 @@ addParameter(inp,'robustness',defaultRobustness,@isnumeric);
 addParameter(inp,'quality',defaultImageQuality,@isnumeric);
 addParameter(inp,'review',defaultReview,@isnumeric);
 addParameter(inp,'retries',defaultRetries,@isnumeric);
+addParameter(inp,'waitbar',defaultWaitbar,@isgraphics);
 
 parse(inp, vidObj, contrast, inicoor, varargin{:});
 
@@ -74,6 +78,7 @@ robust   = inp.Results.robustness;
 quality  = inp.Results.quality;
 review   = inp.Results.review;
 retries  = inp.Results.retries;
+    
 % =======================================================================
 
 warn = 1;   % frame number of the last warning
