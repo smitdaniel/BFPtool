@@ -68,6 +68,7 @@ vidObj   = inp.Results.vidObj;
 contrast = inp.Results.contrast;
 inicoor  = [inp.Results.inicoor(2), inp.Results.inicoor(1)];   % [x,y] -> [r,c]
 range    = inp.Results.range;
+framesToPass = range(2)-range(1)+1; % number of frames to parse
 radius   = inp.Results.radius;
 radius(1)= max(radius(1),1);    % make sure lower bound is non-negative
 buffer   = inp.Results.buffer;
@@ -78,7 +79,14 @@ robust   = inp.Results.robustness;
 quality  = inp.Results.quality;
 review   = inp.Results.review;
 retries  = inp.Results.retries;
-    
+
+if isempty(inp.Results.waitbar) || framesToPass < wbThresh;
+    tbSwitch = false;
+else
+    tbSwitch = true;
+    htrackbar = inp.Results.waitbar;
+end;
+
 % =======================================================================
 
 warn = 1;   % frame number of the last warning
@@ -89,7 +97,7 @@ radii = zeros( range(2) - range(1) + 1,1);      % preallocate; radii of the bead
 centres = zeros( range(2) - range(1) + 1, 2);   % proallocate; centres of the bead
 centres(1,:) = double(inicoor);                 % in [r,c] coordinates
 metrics = zeros( size(radii,1), 1);             % preallocate; metric of the bead detection
-if range(2)-range(1)>0; filmContrast = vidObj.getContrast(); end;            % get a lazy copy of contrast
+if range(2)-range(1)>0; filmContrast = vidObj.getContrast(range(1),range(2)); end;            % get a lazy copy of contrast
 badFrames = false( size(radii,1),1 );           % preallocate array for bad frames
 
 % indices
@@ -98,8 +106,27 @@ frames = 1;         % start from the second frame, the first frame position is g
 frame = vidObj.readFrame(range(1));   % set the first frame;
 threshRelaxes = [0,0];  % how many times were thresholds relaxed, following poor contrast or metric
 
+% waitbar
+if tbSwitch     % do use WB
+    if ~isempty(htrackbar)
+        htrackbar.UserData.beadmsg = strjoin({'Tracking bead'});
+        wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
+        waitbar(0,htrackbar,wbmsg);
+    else
+        htrackbar = waitbar(0,'Tracking bead','Name','Standalone bead tracking');
+    end
+end
+    
+
 % analyze the segment of the video
-while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range(2)) ) % while there's another frame to read and not an and of a segment
+while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % while there's another frame to read and not an and of a segment
+    
+    if tbSwitch
+        htrackbar.UserData.beadmsg = strjoin({'Tracking bead',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
+            char(10),'of the current tracking interval'});
+        wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
+        waitbar(frames/framesToPass,htrackbar,wbmsg);
+    end
     
     % search beads using both methods
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));       % area to search for the circle

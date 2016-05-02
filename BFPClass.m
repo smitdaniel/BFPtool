@@ -132,11 +132,18 @@ classdef BFPClass < handle
         function Track(obj, hplot)
             
             obj.killTrack = false;  % set tracking to continue
-            wbmsg = 'Tracking is about to start';   % waitbar initial message
-            htrackbar = waitbar(0,wbmsg,'Name','Tracking', 'CreateCancelBtn', ...
-                    {@canceltb_callback});  % create waitbar figure and pass it on tracking methods
+            htrackbar = waitbar(0,'Tracking is about to start','Name','Tracking', 'CreateCancelBtn', ...
+                    {@canceltb_callback},...%'Units', 'normalized', ...
+                    'Resize','on','Visible','on');  % create waitbar figure and pass it on tracking methods
+%             tbax = findobj(htrackbar,'type','axes');
+%             tbax.Units = 'normalized';
+%             tbax.Title.FontUnits = 'normalized';
+%             htrackbar.Visible = 'on';
+            htrackbar.UserData.intmsg = 'Tracking is about to start';   % waitbar initial message
             cla(hplot,'reset');
             for int = 1:numel(obj.intervallist)
+                htrackbar.UserData.intmsg = strjoin({'Tracking interval',num2str(int),'of',num2str(numel(obj.intervallist))});
+                waitbar(0,htrackbar,htrackbar.UserData.intmsg);
                 if obj.killTrack; break; end;   % break the tracking if cancelled
                 [obj.pipPositions(int).coor, obj.pipPositions(int).metric, obj.pipPositions(int).bads] = ...
                                             TrackPipette( obj.vidObj, obj.intervallist(int).pattern,...

@@ -23,6 +23,8 @@
 
 function [ position, scores, badFrames ] = TrackPipette( vidObj, pipette, varargin )
 
+wbThresh = 100;
+
 % parse the input; in case initial coordinate and range are not provided,
 % continue by taking the whole range and search the whole field.
 inp = inputParser;
@@ -34,6 +36,7 @@ defaultImageQuality = 0.96;       % level of relative contrast (to maximum) to i
 defaultWideField    = false;      % perform serach in the full field
 defaultStrongRobust = 0.97;       % minimal robustness requirement
 defaultBuffer       = 5;          % grace period if search for pattern fails
+defaultWaitbar      = [];
 
 addRequired(inp,'vidObj');
 addRequired(inp,'pattern');
@@ -44,6 +47,7 @@ addParameter(inp,'robustness', defaultRobustness, @isnumeric);
 addParameter(inp,'quality', defaultImageQuality, @isnumeric);
 addParameter(inp,'wideField', defaultWideField, @islogical);
 addParameter(inp,'buffer', defaultBuffer, @(x) ( ~isnan(x) && x > 0) );
+addParameter(inp,'waitbar', defaultWaitbar, @isgraphics)
 
 parse(inp, vidObj, pipette, varargin{:} );
 
@@ -61,6 +65,7 @@ elseif numel(inp.Results.range) == 1;   % only one input number
         single = true;
     end
 end
+framesToPass = range(2)-range(1)+1;
 inicoor = [ inp.Results.inicoor(2), inp.Results.inicoor(1) ];
 review  = round(inp.Results.review);
 robust  = [ inp.Results.robustness, (1+inp.Results.robustness)/2, defaultStrongRobust ];
@@ -69,9 +74,15 @@ wideField = inp.Results.wideField;
 buffer  = inp.Results.buffer;
 warnSev = [ 1, 1, 1 ];  % frame the last warning was issued (severity 1,2,3)
 lastWF  = 1;            % frame the last wide field (i.e. full frame) search was performed
+if isempty(inp.Results.waitbar) || framesToPass < wbThresh;
+    tbSwitch = false;
+else
+    tbSwitch = true;
+    htrackbar = inp.Results.waitbar;
+end;
 % ======================================================================
 
-[contrast,~] = vidObj.getContrast();    % returns values of contrast for the video (lazy-copy)
+[contrast,~] = vidObj.getContrast(range(1),range(2));    % returns values of contrast for the video (lazy-copy)
 
 % mask to get values of neighbouring pixels
 mask = [ [-1,-1]; [-1,0]; [-1,1]; [0,-1]; [0,0]; [0,1]; [1,-1]; [1,0]; [1,1] ];
@@ -97,8 +108,26 @@ frames = 1;     % framecounter
 failures = 0;   % failed detections
 choice = 'report';  % switch for warning dialogues
 
+% waitbar
+if tbSwitch     % do use WB
+    if ~isempty(htrackbar)
+        htrackbar.UserData.pipmsg = strjoin({'Tracking pipette'});
+        wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.pipmsg});
+        waitbar(0,htrackbar,wbmsg);
+    else
+        htrackbar = waitbar(0,'Tracking bead','Name','Standalone pipette tracking');
+    end
+end
+
 % analyse the interval of frames defined by 'range' parameter
-while( (vidObj.CurrentFrame <= vidObj.Frames) && (range(1) + frames - 1 <= range(2)) )  % while there's another frame to read and range continues
+while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % while there's another frame to read and range continues
+    
+    if tbSwitch
+        htrackbar.UserData.pipmsg = strjoin({'Tracking pipette',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
+            char(10),'of the current tracking interval'});
+        wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.pipmsg});
+        waitbar(frames/framesToPass,htrackbar,wbmsg);
+    end
     
     thisFrame = range(1)-1+frames;
     box = [ max(box(1,1),1), max(box(1,2),1); min(box(2,1),frameDim(1)), min(box(2,2), frameDim(2)) ];

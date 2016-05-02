@@ -124,7 +124,7 @@ classdef vidWrap < handle
             % check if the requested interval was analysed (ffrm:lfrm),
             % redo analysis, if it wastn't, return current values otherwise
             % (this is usually for plotting function call)
-            if isempty(obj.Contrast(ffrm:lfrm)) || any(find(obj.Contrast(ffrm:lfrm)==0)) % second option suggests failed previos run (i.e. contrast should never be zero)                
+            if isempty(obj.Contrast) || any(find(obj.Contrast(ffrm:lfrm)==0)) % second option suggests failed previos run (i.e. contrast should never be zero)                
                 oldFrame = obj.CurrentFrame;
                 obj.Contrast = zeros(obj.Frames,1,'double');
                 obj.GrayLvl  = zeros(obj.Frames,1,'double');
