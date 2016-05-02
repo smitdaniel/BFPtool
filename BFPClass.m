@@ -44,7 +44,6 @@ classdef BFPClass < handle
         sensitivity;
         edge;
         metric;
-        killTrack;  % trigger to cancel tracking
         
         % pipette tracking settings
         correlation;
@@ -67,8 +66,6 @@ classdef BFPClass < handle
     methods
         % constructor
         function obj = BFPClass(varargin)   % in order: name, vidObj, intlist
-            
-            obj.killTrack = false;  % initially, do tracking
             
             if nargin == 0  % default constructor
                 obj.name = 'default';
@@ -131,20 +128,19 @@ classdef BFPClass < handle
         % triggers tracking procedures; takes axes handle to plot results
         function Track(obj, hplot)
             
-            obj.killTrack = false;  % set tracking to continue
             htrackbar = waitbar(0,'Tracking is about to start','Name','Tracking', 'CreateCancelBtn', ...
-                    {@canceltb_callback},...%'Units', 'normalized', ...
+                    {@canceltb_callback},'Units','characters','OuterPosition',[110,40,52,14],...
                     'Resize','on','Visible','on');  % create waitbar figure and pass it on tracking methods
-%             tbax = findobj(htrackbar,'type','axes');
-%             tbax.Units = 'normalized';
-%             tbax.Title.FontUnits = 'normalized';
-%             htrackbar.Visible = 'on';
+            htrackbar.UserData.killTrack = false;   % set flag to carry on
             htrackbar.UserData.intmsg = 'Tracking is about to start';   % waitbar initial message
+            htrackbar.UserData.toBeTracked = 2*obj.toBeTracked;   % total number of frames to be tracked x 2 (pipette+bead)
+            htrackbar.UserData.wereTracked = 0;     % store number of tracked frames
+            %gdata = guidata(htrackbar,htrackbar.
             cla(hplot,'reset');
             for int = 1:numel(obj.intervallist)
+                if htrackbar.UserData.killTrack; break; end;   % break the tracking if cancelled
                 htrackbar.UserData.intmsg = strjoin({'Tracking interval',num2str(int),'of',num2str(numel(obj.intervallist))});
                 waitbar(0,htrackbar,htrackbar.UserData.intmsg);
-                if obj.killTrack; break; end;   % break the tracking if cancelled
                 [obj.pipPositions(int).coor, obj.pipPositions(int).metric, obj.pipPositions(int).bads] = ...
                                             TrackPipette( obj.vidObj, obj.intervallist(int).pattern,...
                                             obj.intervallist(int).patcoor,obj.intervallist(int).frames,...
@@ -171,16 +167,18 @@ classdef BFPClass < handle
                 obj.trackedFrames = obj.trackedFrames + ...
                                    (obj.intervallist(int).frames(2)-obj.intervallist(int).frames(1)+1);
             end
+            delete(htrackbar);
             obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');          % plot the tracking data
             obj.tracked = true;             % set 'tracked' flag
             obj.generateReport();
+            
+                    % callback to kill tracking by pressing cancel on wb
+            function canceltb_callback(~,~)
+                htrackbar.UserData.killTrack = true;
+            end
+            
         end
         
-        % callback to kill tracking by pressing cancel on wb
-        function canceltb_callback(~,~)
-            obj.killTrack = true;
-            delete(htrackbar);
-        end
         
         % plots detected tracks; in 3D, the z-dimension is the time axis
         function [] = plotTracks(obj, hplot, varargin )

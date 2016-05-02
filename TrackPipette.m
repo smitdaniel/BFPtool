@@ -111,10 +111,12 @@ choice = 'report';  % switch for warning dialogues
 % waitbar
 if tbSwitch     % do use WB
     if ~isempty(htrackbar)
+        wereTracked = htrackbar.UserData.wereTracked;   % get the number of finished frames
         htrackbar.UserData.pipmsg = strjoin({'Tracking pipette'});
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.pipmsg});
         waitbar(0,htrackbar,wbmsg);
     else
+        wereTracked = 0;
         htrackbar = waitbar(0,'Tracking bead','Name','Standalone pipette tracking');
     end
 end
@@ -122,11 +124,19 @@ end
 % analyse the interval of frames defined by 'range' parameter
 while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % while there's another frame to read and range continues
     
+    if htrackbar.UserData.killTrack; 
+        vidObj.readFrame(range(1));   % reset the first frame;
+        htrackbar.UserData.wereTracked = 0;  % cancelled tracking, reset the counter
+        return; 
+    end;
+    
     if tbSwitch
+        trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
         htrackbar.UserData.pipmsg = strjoin({'Tracking pipette',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
-            char(10),'of the current tracking interval'});
+            char(10),'of the current tracking interval.',char(10),'Finished',...
+            num2str(round(trackedRatio*100)),'% of total.'});
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.pipmsg});
-        waitbar(frames/framesToPass,htrackbar,wbmsg);
+        waitbar(trackedRatio,htrackbar,wbmsg);
     end
     
     thisFrame = range(1)-1+frames;
@@ -268,6 +278,9 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
         
 end;    % end for the while cycle of the interval
 
+vidObj.readFrame(range(1));
+htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
+
     % ======================= support nested functions =================
 
     % tries to search for the pipette in the full field; if better match is
@@ -390,6 +403,7 @@ end;    % end for the while cycle of the interval
             warning('Incorrect input in ''isIn'' function. Input must be a pair of indices, [row,col]');
         end
     end
-    
+
+   
 end
 

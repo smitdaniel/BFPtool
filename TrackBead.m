@@ -109,23 +109,33 @@ threshRelaxes = [0,0];  % how many times were thresholds relaxed, following poor
 % waitbar
 if tbSwitch     % do use WB
     if ~isempty(htrackbar)
+        wereTracked = htrackbar.UserData.wereTracked;   % get the number of finished frames
         htrackbar.UserData.beadmsg = strjoin({'Tracking bead'});
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
         waitbar(0,htrackbar,wbmsg);
     else
         htrackbar = waitbar(0,'Tracking bead','Name','Standalone bead tracking');
+        wereTracked = 0;
     end
 end
-    
+
 
 % analyze the segment of the video
 while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % while there's another frame to read and not an and of a segment
     
+    if htrackbar.UserData.killTrack; 
+        vidObj.readFrame(range(1));   % reset the first frame;
+        htrackbar.UserData.wereTracked = 0;  % cancelled tracking, reset the counter
+        return; 
+    end;
+    
     if tbSwitch
+        trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
         htrackbar.UserData.beadmsg = strjoin({'Tracking bead',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
-            char(10),'of the current tracking interval'});
+            char(10),'of the current tracking interval.',char(10),'Finished',...
+            num2str(round(trackedRatio*100)),'% of total.'});
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
-        waitbar(frames/framesToPass,htrackbar,wbmsg);
+        waitbar(trackedRatio,htrackbar,wbmsg);
     end
     
     % search beads using both methods
@@ -226,6 +236,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
 
 end
 vidObj.readFrame(range(1)); % return iterator back to the initial frame
+htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
 
 % retries the search with relaxed parameters
 function [got] = retry(C)
@@ -254,7 +265,6 @@ function [LP] = lastPosition()
         LP = [inicoor(2),inicoor(1)];
     end
 end
-    
-    
+  
 end
 
