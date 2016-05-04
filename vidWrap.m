@@ -23,7 +23,7 @@ classdef vidWrap < handle
         Height   = 0;
         Duration = 0;
         Framerate = 0;
-        Frames   = 0;
+        Frames   = 0;       % number of frames in the video
 
         CurrentFrame = 0;
         
@@ -118,22 +118,27 @@ classdef vidWrap < handle
             end
         end
         
-        % calculates measure of contrast accross the frames
+        % Procedure verifies, if the contrast exists for all frames of video,
+        % and if is unbroken (i.e. nonzero) in the requested interval. 
+        % Recalculates all frames if conditions are not met and returns
+        % the FULL array 'contrast', not just the requested subinterval.
+        % Returned array is truncated ONLY if the process is cancelled by
+        % the user.
         function [ contrast, meanGray ] = getContrast(obj, ffrm, lfrm)
-            
             % check if the requested interval was analysed (ffrm:lfrm),
             % redo analysis, if it wastn't, return current values otherwise
             % (this is usually for plotting function call)
-            if isempty(obj.Contrast) || any(find(obj.Contrast(ffrm:lfrm)==0)) % second option suggests failed previos run (i.e. contrast should never be zero)                
+            if (isempty(obj.Contrast) || numel(obj.Contrast) < obj.Frames || ...
+               any(find(obj.Contrast(ffrm:lfrm)==0))) % the last option suggests failed previos run (i.e. contrast should never be zero)                
                 oldFrame = obj.CurrentFrame;
                 obj.Contrast = zeros(obj.Frames,1,'double');
                 obj.GrayLvl  = zeros(obj.Frames,1,'double');
-                warning(strjoin({'Contrast calculation for the requested interval',strcat('[',...
-                    num2str(ffrm),':', num2str(lfrm),']'),'was started before, but was not',...
+                warning(strjoin({'Contrast for the requested interval',strcat('[',...
+                    num2str(ffrm),':', num2str(lfrm),']'),'was either not calculated before, not',...
                     'finished, or the results are malformed. Contrast will be recalculated',...
                     'for the whole video.'}));
 
-                disp('Calculating the contrast for each frame of the film');
+                disp('Calculating the contrast for each frame of the film.');
                 
                 wbmsg = strjoin({'Calculating contrast of video of', num2str(obj.Frames),'frames'});
                 hwaitbar = waitbar(0,wbmsg,'Name','Contrast calculation', 'CreateCancelBtn', ...
@@ -141,7 +146,7 @@ classdef vidWrap < handle
                 killwb = false;
                 for frm=1:obj.Frames;
                     if killwb; break; end;
-                    waitbar(frm/obj.Frames);
+                    waitbar(frm/obj.Frames,hwaitbar);
                     thisFrame = obj.readFrame(frm);
                     doubleFrame = double(thisFrame.cdata);
                     obj.Contrast(frm) = std2(doubleFrame);
@@ -177,8 +182,10 @@ classdef vidWrap < handle
             function cancelwb_callback(~,~)
                 killwb = true;
                 delete(hwaitbar);
+                obj.Contrast(frm+1:end) = [];
+                obj.GrayLvl(frm+1:end)  = [];
                 disp(strjoin({'Calculation interrupted by user. Currently processed',...
-                    num2str(frm), 'frames. The data will remain accessible, padded with zeros.'}));
+                    num2str(frm), 'frames. The data will remain accessible, but will be recalculated on the next request.'}));
             end
             
         end

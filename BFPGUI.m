@@ -98,7 +98,7 @@ colformat = {'numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','num
 axesposition = [0.05,0.05,0.5,0.5];
 handles.tmpbeadframe = [];  % stores value of current bead frame selected for the interval
 handles.tmppatframe = [];   % ... and the same for the pipette pattern
-handles.interval = struct('frames', [0,0]); % currently assembled interval (not in the list yet)
+handles.interval = struct('frames', [1,1]); % currently assembled interval (not in the list yet)
 handles.intervallist = [];  % list of tracking intervals with settings
 BFPobj = [];                % BFPClass object containing the calculation/tracking
 handles.remove = [];        % list of interval entries to remove from the complete list
@@ -333,12 +333,12 @@ handles.hintervaltxt= uicontrol('Parent',handles.hsetinterval, 'Style', 'text', 
                       'TooltipString', 'Interval of interest for tracking, in frames',...
                       'Units','normalized','Position', [0,0.75,0.25,0.25],'HorizontalAlignment','left' );
 handles.hstartint   = uicontrol('Parent', handles.hsetinterval, 'Style', 'edit', 'String', [],'Enable','off',...
-                      'Units','normalized','Position', [0.25,0.75,0.15,0.25],'Callback',{@setintrange_callback,0,1});
+                      'Units','normalized','Position', [0.25,0.75,0.15,0.25],'Callback',{@setintrange_callback,1,1});
 handles.hshowframe  = uicontrol('Parent',handles.hsetinterval, 'Style', 'pushbutton', 'String', 'Show', ...
                       'Units','normalized','Position', [0.4,0.75,0.1,0.25],'Enable','off',...
                       'Callback',{@gotointframe_callback});                  
 handles.hendint     = uicontrol('Parent', handles.hsetinterval, 'Style', 'edit', 'String', [],'Enable','off',...
-                      'Units','normalized','Position', [0.5,0.75,0.25,0.25],'Callback',{@setintrange_callback,0,2});
+                      'Units','normalized','Position', [0.5,0.75,0.25,0.25],'Callback',{@setintrange_callback,1,2});
 handles.hrefframe  = uicontrol('Parent',handles.hsetinterval, 'Style', 'edit', 'String', [],'Enable','off',...
                       'Units','normalized','Position', [0.75,0.75,0.15,0.25],...
                       'Callback',{@setrefframe_callback,0});
@@ -1293,7 +1293,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             case 4  % force
                 BFPobj.plotTracks(handles.hgraph,handles.lowplot,handles.highplot,false,false,'Style','F');
                 handles.thisRange = [handles.lowplot, handles.highplot];
-                plotZeroLine();     % plots dashed red line at y=0 to indicate pulling and pushing
+                if numel(BFPobj.force)~=0;
+                    plotZeroLine();     % plots dashed red line at y=0 to indicate pulling and pushing
+                end;
             case 5  % metrics
                 if (handles.hgraphpip.Value || handles.hgraphbead.Value)
                     BFPobj.plotTracks(handles.hgraph,handles.lowplot,handles.highplot,logical(handles.hgraphpip.Value),logical(handles.hgraphbead.Value),'Style','M');
@@ -1686,9 +1688,12 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         msgbox(strep,'Interval addition report','modal');        
         
         % clear interval to be reused; clear UI data; clear temp. variables
-        handles.interval = struct('frames',[0,0]);
-        handles.hstartint.String = [];
-        handles.hendint.String = [];
+        % reset tracking interval to fault-free combination
+        handles.interval = struct('frames',[round(vidObj.CurrentFrame),round(vidObj.Frames)]);  % rounding might not be necessary
+        set(handles.hstartint, 'String', num2str(handles.interval.frames(1)),...
+            'Callback',{@setintrange_callback,handles.interval.frames(1),1});   % reset range and callback parameters
+        set(handles.hendint, 'String', num2str(handles.interval.frames(2)),...
+            'Callback',{@setintrange_callback,handles.interval.frames(2),2});
         handles.hrefframe.String = [];
         handles.hpatternint.String = '[.,.;.]';
         handles.hbeadint.String = '[.,.;.]';
@@ -1906,20 +1911,29 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % set the range of frames to track
     function setintrange_callback(source,~,oldval,num)
         in = str2double(source.String);
+        % check if input is a valid number
         if (isnan(in) || in < 1 || in > vidObj.Frames)
             warndlg({'Input must be a positive number within the video limits.';'Input is rounded.'},...
                     'Incorrect input', 'replace');
-            source.String = [];
+            source.String = num2str(oldval);
             handles.interval.frames(num) = oldval;
             return;
         end
         low  = round(str2double(handles.hstartint.String));
         high = round(str2double(handles.hendint.String));
+        % check if interval is at least one frame
         if (low > high)
-            warndlg('The input range is empty.', 'Incorrect input','replace');
+            warndlg('The input range is empty. Original value will be reset.',...
+                'Incorrect input','replace');
+            source.String = num2str(oldval);
+            handles.interval.frames(num) = oldval;
+            return;
         end
         handles.interval.frames = [low,high];
-        handles.hgetbead.Enable = 'on';
+        handles.hgetbead.Enable = 'on';        
+        % all tests passed, update callback arguments for UIs
+        handles.hstartint.Callback = {@setintrange_callback,low,1};
+        handles.hendint.Callback = {@setintrange_callback,high,2};
     end
 
     % measure radius of the pipette
@@ -2190,7 +2204,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             handles.selecting = true;
         end
             
-        [handles.bead,pass,~] = getBead(source,srctag);  % call method to detect handles.bead
+        [handles.bead,pass,~] = getBead(source,srctag);  % call method to detect bead
         
         % if detection fails (reject or error), old 'handles.bead' value is returned
         % if old value is empty, stop here, do not change anything
@@ -2339,7 +2353,12 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             handles.highplot = vidObj.Frames;   % final frame
         end
         
-        [ contrast, ~ ] = vidObj.getContrast(handles.lowplot, handles.highplot);    % calculates and saves in video object, if not yet calculated
+        % returned 'contrast' all video frames, regardeless of subinterval
+        % see function comment for details
+        [ contrast, ~ ] = vidObj.getContrast(handles.lowplot, handles.highplot);    
+        if numel(contrast) ~= vidObj.Frames % if process of contrast calculation was cancelled
+            handles.highplot = min(handles.lowplot+numel(contrast)-1, vidObj.Frames);
+        end
         
         handles.fitInt = [handles.lowplot, 0; handles.highplot, 0];  % set global fit interval
         
@@ -2447,7 +2466,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hplaybutton.Callback = {@playvideo_callback,1}; % restores play callback, sets framerate to 1
     end
 
-    % open video and set its parameters where necessary
+    % open video and set its parameters where necessary; update callbacks
     function openvideo_callback(~,~)
         if exist(handles.videopath,'file') ~= 2;    % i.e. path is not a path to a file
             warndlg('Path is incorrect or the file doesn''t exist','File inaccessible','replace');
@@ -2462,7 +2481,12 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 handles.hmoviebar.SliderStep = [ 1/vidObj.Frames, 0.1 ];
                 setframe(1);
                 setvidinfo();
-                setvidinterval();
+                handles.interval.frames = [1,vidObj.Frames];    % set initial interval and callback parameters
+                set(handles.hstartint, 'String', num2str(handles.interval.frames(1)),...
+                    'Callback',{@setintrange_callback,handles.interval.frames(1),1});
+                set(handles.hendint, 'String', num2str(handles.interval.frames(2)),...
+                    'Callback',{@setintrange_callback,handles.interval.frames(2),2});
+                set([handles.hgetbead, handles.hselectbead],'Enable','on'); % enable selections
                 set([handles.hdispframe,handles.hstartint,handles.hendint,handles.hshowframe,handles.hrefframe],'Enable','on');
                 set([handles.hplaybutton,handles.hrewindbtn,handles.hffwdbutton,handles.hcontrast],'Enable','on');
             catch
@@ -2620,7 +2644,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             beadpoint.delete;
             [coor,rad,metric,~] = TrackBead(vidObj, beadinfo.contrast, beadinfo.coor,...
                          [ beadinfo.frame, beadinfo.frame ], 'retries', 1 );  % try to detect the bead in the frame
-
+                    
             if rad == 0;    % stop if nothing is detected
                 warndlg(strjoin({'No bead was detected in the given vicinity for',beadinfo.contrast,'contrast.',...
                     'Please repeat Your selection, placing the search point within the desired bead',...
@@ -2716,16 +2740,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
-    % sets fields during opening of the video
-    function setvidinterval()
-        handles.interval.frames(1) = 1;
-        handles.interval.frames(2) = vidObj.Frames;
-        handles.hstartint.String = num2str(1);
-        handles.hendint.String = num2str(vidObj.Frames);
-        handles.hgetbead.Enable = 'on';
-        handles.hselectbead.Enable = 'on';
-    end
-    
+   
     % copy structure into an empty target
     function outlist = strucopy(outlist,item)
         size = numel(outlist);

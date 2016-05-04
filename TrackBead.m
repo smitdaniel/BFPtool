@@ -15,6 +15,7 @@
 %   imagequality: how bad can image be
 %   review  : number of frames averaged to get info about metric and contr.
 %   retries : number of retries for one frame (w/ relaxed conditions)
+%   waitbar : handle to figure of tracking progress bar started externally
 %   OUT:
 %   centres : centres of the detected bead, one centre per frame
 %   radii   : radius for each frame of detection
@@ -32,7 +33,7 @@
 
 function [ centres, radii, metrics, badFrames ] = TrackBead( vidObj, contrast, inicoor, varargin )
 
-wbThresh = 100;                     % minimal number of frames to track to generate waitbar
+wbThresh = 100;                     % minimal number of frames to track to generate a waitbar
 
 inp = inputParser;  
 defaultRange        = -1;           % range of frames to analyze
@@ -80,7 +81,8 @@ quality  = inp.Results.quality;
 review   = inp.Results.review;
 retries  = inp.Results.retries;
 
-if isempty(inp.Results.waitbar) || framesToPass < wbThresh;
+% if no WB was passed in and the interval is short, do not generate WB
+if isempty(inp.Results.waitbar) && framesToPass < wbThresh;
     tbSwitch = false;
 else
     tbSwitch = true;
@@ -113,8 +115,10 @@ if tbSwitch     % do use WB
         htrackbar.UserData.beadmsg = strjoin({'Tracking bead'});
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
         waitbar(0,htrackbar,wbmsg);
-    else
+    else        
         htrackbar = waitbar(0,'Tracking bead','Name','Standalone bead tracking');
+        htrackbar.UserData.intmsg = 'No ongoing tracking provided';
+        htrackbar.UserData.killTrack = false;
         wereTracked = 0;
     end
 end
@@ -123,13 +127,16 @@ end
 % analyze the segment of the video
 while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % while there's another frame to read and not an and of a segment
     
-    if htrackbar.UserData.killTrack; 
-        vidObj.readFrame(range(1));   % reset the first frame;
-        htrackbar.UserData.wereTracked = 0;  % cancelled tracking, reset the counter
-        return; 
-    end;
-    
-    if tbSwitch
+    % ====  INFO SECTION ====
+   
+    if tbSwitch     % update WB, if any exists
+        % check if flag to stop tracking is on or not
+        if htrackbar.UserData.killTrack; 
+            vidObj.readFrame(range(1));                     % reset the first frame;
+            htrackbar.UserData.wereTracked = wereTracked;   % cancelled tracking, reset the counter
+            return; 
+        end;
+        
         trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
         htrackbar.UserData.beadmsg = strjoin({'Tracking bead',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
             char(10),'of the current tracking interval.',char(10),'Finished',...
@@ -137,7 +144,9 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
         waitbar(trackedRatio,htrackbar,wbmsg);
     end
+       
     
+    % ====  THE TRACKING PART   ====
     % search beads using both methods
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));       % area to search for the circle
     [centre,rad,metric] = imfindcircles(subframe, radius, 'ObjectPolarity',contrast,...
@@ -236,8 +245,10 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
 
 end
 vidObj.readFrame(range(1)); % return iterator back to the initial frame
-htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
-
+if tbSwitch
+    htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
+end;
+    
 % retries the search with relaxed parameters
 function [got] = retry(C)
     

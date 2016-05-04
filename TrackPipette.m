@@ -9,6 +9,7 @@
 %   quality : threshold for poor contrast warnings
 %   wideField  : switch for unrestricted search in the whole field
 %   buffer  : number of failed consecutive frame searches before aborting
+%   waitbar : handle to figure of tracking progress bar started externally
 %   OUT:
 %   position   : array of pipette positions for each frame
 %   scores     : array of cross-correlation values for each frame
@@ -74,7 +75,8 @@ wideField = inp.Results.wideField;
 buffer  = inp.Results.buffer;
 warnSev = [ 1, 1, 1 ];  % frame the last warning was issued (severity 1,2,3)
 lastWF  = 1;            % frame the last wide field (i.e. full frame) search was performed
-if isempty(inp.Results.waitbar) || framesToPass < wbThresh;
+% if no WB was passed in and the interval is short, do not generate WB
+if isempty(inp.Results.waitbar) && framesToPass < wbThresh;
     tbSwitch = false;
 else
     tbSwitch = true;
@@ -118,19 +120,22 @@ if tbSwitch     % do use WB
     else
         wereTracked = 0;
         htrackbar = waitbar(0,'Tracking bead','Name','Standalone pipette tracking');
+        htrackbar.UserData.intmsg = 'No ongoing tracking provided';
+        htrackbar.UserData.killTrack = false;
     end
 end
 
 % analyse the interval of frames defined by 'range' parameter
 while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % while there's another frame to read and range continues
     
-    if htrackbar.UserData.killTrack; 
-        vidObj.readFrame(range(1));   % reset the first frame;
-        htrackbar.UserData.wereTracked = 0;  % cancelled tracking, reset the counter
-        return; 
-    end;
-    
+    % ====  INFO SECTION  ====
     if tbSwitch
+        if htrackbar.UserData.killTrack; 
+            vidObj.readFrame(range(1));   % reset the first frame;
+            htrackbar.UserData.wereTracked = wereTracked;  % cancelled tracking, reset the counter
+            return; 
+        end;
+        
         trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
         htrackbar.UserData.pipmsg = strjoin({'Tracking pipette',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
             char(10),'of the current tracking interval.',char(10),'Finished',...
@@ -139,6 +144,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
         waitbar(trackedRatio,htrackbar,wbmsg);
     end
     
+    % ====  TRACKING SECTION  ====
     thisFrame = range(1)-1+frames;
     box = [ max(box(1,1),1), max(box(1,2),1); min(box(2,1),frameDim(1)), min(box(2,2), frameDim(2)) ];
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));   % area to search for the pipette
@@ -279,7 +285,9 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
 end;    % end for the while cycle of the interval
 
 vidObj.readFrame(range(1));
-htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
+if(tbSwitch)
+    htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
+end;
 
     % ======================= support nested functions =================
 
