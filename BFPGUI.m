@@ -49,7 +49,7 @@ function [ backdoorObj ] = BFPGUI( varargin )
 handles.verbose = true;     % sets UI to provide more (true) or less (false) messages
 handles.selecting = false;  % indicates, if selection is under way and blocks other callbacks of selection
 handles.fitfontsize = 0.07; % normalized size of the font in equations
-handles.labelfontsize = 0.05;   % normalized size of the font in (some) labels
+handles.labelfontsize = 0.04;   % normalized size of the font in (some) labels
 % handles.verbose is a switch for a 'warn' method. It decides whether some of the
 % warnings appear as warning dialogues, or just command line warnings
 
@@ -98,7 +98,7 @@ colformat = {'numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','num
 axesposition = [0.05,0.05,0.5,0.5];
 handles.tmpbeadframe = [];  % stores value of current bead frame selected for the interval
 handles.tmppatframe = [];   % ... and the same for the pipette pattern
-handles.interval = struct('frames', [1,1]); % currently assembled interval (not in the list yet)
+handles.interval = struct('frames', [1,1],'pattern',[]); % currently assembled interval (not in the list yet)
 handles.intervallist = [];  % list of tracking intervals with settings
 BFPobj = [];                % BFPClass object containing the calculation/tracking
 handles.remove = [];        % list of interval entries to remove from the complete list
@@ -133,7 +133,7 @@ GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
         
 GUIflags.Values = {'hmoviebar', 'hpatternlist', 'hcorrthresh','hcontrasthresh', 'hbeadinilist',...
             'hsensitivitybar', 'hgradbar', 'hmetric','hgraphbead','hgraphpip','hverbose','hhideexp',...
-            'hhidelist','hhidedet', 'hdisptrack'};
+            'hhidelist','hhidedet', 'hdisptrack', 'hgraphitem'};
 
 GUIflags.Enables = {'hmoviebar', 'hplaybutton', 'hrewindbtn', 'hffwdbutton', ...
             'hcontrast', 'hgenfilm', 'hstartint', 'hshowframe', 'hendint', 'hrefframe',...
@@ -327,7 +327,7 @@ set([handles.hradtxt,handles.hminrad,handles.hmaxrad,handles.hbuffertxt, handles
 % ====================================================================
 
 % ==================== SELECTING INTERVALS TO TRACK ==================
-handles.hintervals  = uitabgroup('Parent', handles.hfig, 'Units','normalized', 'Position', [0.05, 0.635, 0.25, 0.125]);
+handles.hintervals  = uitabgroup('Parent', handles.hfig, 'Units','normalized', 'Position', [0.05, 0.635, 0.25, 0.225]);
 handles.hsetinterval  = uitab('Parent', handles.hintervals, 'Title', 'Set interval', 'Units', 'normalized');
 handles.hintervaltxt= uicontrol('Parent',handles.hsetinterval, 'Style', 'text', 'String', 'Interval:', ...
                       'TooltipString', 'Interval of interest for tracking, in frames',...
@@ -344,7 +344,7 @@ handles.hrefframe  = uicontrol('Parent',handles.hsetinterval, 'Style', 'edit', '
                       'Callback',{@setrefframe_callback,0});
 handles.hgetrefframe = uicontrol('Parent',handles.hsetinterval, 'Style', 'pushbutton', 'String', {'Get';'current'}, ...
                       'Units','normalized','Position', [0.9,0.75,0.1,0.25],'Enable','off',...
-                      'TooltipString', 'Sets currently visible frame as the reference frame',...
+                      'TooltipString', 'Searches pattern''s reference frame in previous records',...
                       'Callback', {@getrefframe_callback});                  
 handles.hpatterntxt  = uicontrol('Parent',handles.hsetinterval, 'Style', 'text', 'String', 'Selected pattern:', ...
                       'TooltipString', 'Pattern to be tracked over the interval',...
@@ -401,28 +401,28 @@ handles.heraseint     = uicontrol('Parent',handles.hlistinterval,'Style','pushbu
 
 % ============== EXPERIMENTAL PARAMETERS =============================
 handles.hexpdata = uibuttongroup('Parent', handles.hfig, 'Title','Experimental parameters', 'Units','normalized',...
-            'Position', [0.05, 0.76, 0.25, 0.1],'Visible','off');
+            'Position', [0.86,0.05,0.1,0.5],'Visible','off');
 handles.hprestxt    = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'String', 'Pressure:',...
-            'Units', 'normalized','Position', [0,0.75,0.25,0.25]);
+            'Units', 'normalized','Position', [0,0.6,0.5,0.2]);
 handles.hpressure   = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.pressure),...
-            'Units', 'normalized','Position', [0.25,0.75,0.2,0.25],'Callback', {@setexpdata_callback,handles.pressure}); 
-handles.hRBCtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String','RBC radius:',...
-            'Units', 'normalized','Position', [0,0.5,0.25,0.25],'Callback',@measureRBC_callback);
+            'Units', 'normalized','Position', [0.5,0.6,0.45,0.2],'Callback', {@setexpdata_callback,handles.pressure}); 
+handles.hRBCtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String','<HTML><center>RBC<br>radius:</HTML>',...
+            'Units', 'normalized','Position', [0,0.4,0.5,0.2],'Callback',@measureRBC_callback);
 handles.hRBCrad     = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.RBCradius),...
-            'Units', 'normalized','Position', [0.25,0.5,0.2,0.25],'Callback', {@setexpdata_callback,handles.RBCradius});
-handles.hPIPtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String', 'Pipette radius:',...
-            'Units', 'normalized','Position', [0,0.25,0.25,0.25],'Callback',{@measureLength_callback,'pipette'});
+            'Units', 'normalized','Position', [0.5,0.4,0.45,0.2],'Callback', {@setexpdata_callback,handles.RBCradius});
+handles.hPIPtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String', '<HTML><center>Pipette<br>radius:</HTML>',...
+            'Units', 'normalized','Position', [0,0.2,0.5,0.2],'Callback',{@measureLength_callback,'pipette'});
 handles.hPIPrad     = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.PIPradius),...
-            'Units', 'normalized','Position', [0.25,0.25,0.2,0.25],'Callback', {@setexpdata_callback,handles.PIPradius}); 
-handles.hCAtxt      = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String', 'Contact radius:',...
-            'Units', 'normalized','Position', [0,0,0.25,0.25],'Callback',{@measureLength_callback,'contact'});
+            'Units', 'normalized','Position', [0.5,0.2,0.45,0.2],'Callback', {@setexpdata_callback,handles.PIPradius}); 
+handles.hCAtxt      = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String', '<HTML><center>Contact<br>radius:</HTML>',...
+            'Units', 'normalized','Position', [0,0,0.5,0.2],'Callback',{@measureLength_callback,'contact'});
 handles.hCArad      = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.CAradius),...
-            'Units', 'normalized','Position', [0.25,0,0.2,0.25],'Callback', {@setexpdata_callback,handles.CAradius});
+            'Units', 'normalized','Position', [0.5,0,0.45,0.2],'Callback', {@setexpdata_callback,handles.CAradius});
 handles.hP2Mtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'String', 'Pixel to micron:',...
-            'Units', 'normalized','Position', [0.5,0.75,0.25,0.25]);
+            'Units', 'normalized','Position', [0,0.8,0.5,0.2]);
 handles.hP2M        = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.P2M),...
-            'Units', 'normalized','Position', [0.75,0.75,0.2,0.25],'Callback', {@setexpdata_callback,handles.P2M});
-set([handles.hprestxt,handles.hRBCtxt,handles.hPIPtxt,handles.hCAtxt,handles.hP2Mtxt],'HorizontalAlignment','left','FontUnits','normalized');
+            'Units', 'normalized','Position', [0.5,0.8,0.45,0.2],'Callback', {@setexpdata_callback,handles.P2M});
+set([handles.hprestxt,handles.hRBCtxt,handles.hPIPtxt,handles.hCAtxt,handles.hP2Mtxt],'HorizontalAlignment','center','FontUnits','normalized');
 set([handles.hpressure,handles.hRBCrad,handles.hPIPrad,handles.hCArad,handles.hP2M],'FontUnits','normalized');
 % ====================================================================
 
@@ -960,7 +960,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
         if handles.thisPlot ~= 4 && handles.thisPlot ~= 1 && handles.thisPlot ~=5 && handles.thisPlot ~= 6
             choice = questdlg(['The fitting procedure is available only for force, contrast, metrics and imported outer graph',...
-                    'Would You like to switch graph?'],'Force fitting','Force','Contrast','Metrics', 'Cancel','Force');
+                    'Would You like to switch graph?'],'Data fitting','Force','Contrast','Metrics', 'Force');
             switch choice
                 case 'Force'
                     handles.toPlot = 4;
@@ -974,7 +974,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     handles.toPlot = 5;
                     handles.hgraphitem.Value = handles.toPlot;
                     graphplot_callback(0,0);
-                case 'Cancel'
+                otherwise
                     return;
             end
         end
@@ -982,46 +982,67 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         % set up descriptive strings
         switch handles.thisPlot
             case 4    % force
-                units = 'pN$$';
+                units  = '\; pN$$';
+                unit   = ' pN/s';
+                lunits = '\frac{pN}{s}$$';
                 quant = '$$\bar{F}=';
                 rnd = 1;
             case 1  % contrast
-                units = '$$';
+                units  = '$$';
+                unit   = ' per second';
+                lunits = '\; s^{-1}$$';
                 quant = '$$\bar{C}=';
                 rnd = 3;
             case 5  % metrics
                 units = '$$';
+                unit  = ' per second';
+                lunits = '\; s^{-1}$$';
                 quant = '$$\bar{\mu}=';
                 rnd = 3;
         end
+        
+        eunits = '\; s^{-1}$$'; % the same for all cases
         
         % set fitting interval
         if isempty(handles.fitInt); handles.fitInt = [ handles.hgraph.XLim(1), 0; handles.hgraph.XLim(2), 0] ; end;     % if none provided, select current graph limits
         handles.hfitint.String = strcat('<HTML><center>Change<br>[',num2str(round(handles.fitInt(1,1))),',',...
                          num2str(round(handles.fitInt(2,1))),']</HTML>');                       % save the info about the current fitting interval
         
-        int = (handles.fitInt(1,1):handles.fitInt(2,1))';   % set the selected interval
-        frc = zeros(numel(int),1);          % preallocate data to be fit
+        iniInt = [handles.fitInt(1,1), handles.fitInt(2,1)];   % set the selected interval
+        xdata = struct('data',[]);          % initialize variable for data range
+        ydata = struct('data',[]);          % initialize variable for the data to be fit
         
         hplotline = findobj(handles.hgraph,'Type','line');  % find the data line
         for l = 1:numel(hplotline)
-            xmin = hplotline(l).XData(1);
-            frc(:,l) = hplotline(l).YData(int-xmin+1)';
+            xdata(l).data = (max(hplotline(l).XData(1),iniInt(1)):min(hplotline(l).XData(end),iniInt(2)))';
+            if isempty(xdata(l).data);
+                xdata(l).data = [];
+                ydata(l).data = [];
+            else ydata(l).data = hplotline(l).YData(xdata(l).data - hplotline(l).XData(1)+1)';
+            end
         end;
+        
+        % prune empty items
+        for l=numel(xdata):-1:1
+            if isempty(xdata(l).data);
+                xdata(l) = [];
+                ydata(l) = [];
+            end
+        end
             
         nextPlateau = 1;
         
         hold(handles.hgraph,'on');
         
-        for l=1:size(frc,2) % for all fitted data columns
+        for l=1:numel(ydata) % for all fitted data lines
             switch type
                 case 'line'
-                    [ coeff, err ] = polyfit( int, frc(:,l), 1);
-                    [ ffrc, ~ ] = polyval( coeff, int, err );
-                    disp(strcat('Fitted slope: ',num2str(coeff(1))) );
-                    hfitplot(l).ph = plot(handles.hgraph, int, ffrc, 'r', 'HitTest', 'off');
-                    str = strcat('$$r=',num2str(coeff(1)),'$$');
-                    pos = 0.5*[ (int(end) + int(1)), (ffrc(end)+ffrc(1)) ];
+                    [ coeff, err ] = polyfit( xdata(l).data, ydata(l).data, 1);
+                    [ ffrc, ~ ] = polyval( coeff, xdata(l).data, err );
+                    disp(strcat('Fitted slope: ',num2str(coeff(1)*vidObj.Framerate), unit) );
+                    hfitplot(l).ph = plot(handles.hgraph, xdata(l).data, ffrc, 'r', 'HitTest', 'off');
+                    str = strcat('$$r=',num2str(round(coeff(1)*vidObj.Framerate,2,'significant')),lunits);
+                    pos = 0.5*[ (xdata(l).data(end) + xdata(l).data(1)), (ffrc(end)+ffrc(1)) ];
                     hfitplot(l).txt = text( 'Parent', handles.hgraph, 'interpreter', 'latex', 'String', str, ...
                 'Units', 'data', 'Position', pos, 'Margin', 1, 'FontUnits','normalized',...
                 'LineStyle','none', 'HitTest','off','FontSize',handles.fitfontsize, 'FontWeight','bold','Color','red',...
@@ -1029,54 +1050,62 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 case 'exp'
                     if ~isempty(vidObj)     % make sure vidObj exist, if it doesn't, outer data are being fit
                         if (vidObj.Framerate ~= 0)
-                            [ coeff, ffrc ] = expfit( int, frc(:,l), 'framerate', vidObj.Framerate );
+                            [ coeff, ffrc ] = expfit( xdata(l).data, ydata(l).data, 'framerate', vidObj.Framerate );
                         end
                     else    % case for imported data
-                        [ coeff, ffrc ] = expfit( int, frc(:,l) );
+                        [ coeff, ffrc ] = expfit( xdata(l).data, ydata(l).data );
                     end
-                    disp(strcat('Time constant: ',num2str(coeff(1))) );
-                    str = strcat('$$\eta=',num2str(coeff(1)),'$$');
-                    pos = 0.5*[ (int(end) + int(1)), (ffrc(end)+ffrc(1)) ];
+                    disp(strcat('Time constant: ',num2str(coeff(1)),{' '},'s') );
+                    str = strcat('$$\eta=',num2str(round(1/coeff(1),3,'significant')),eunits);
+                    pos = 0.5*[ (xdata(l).data(end) + xdata(l).data(1)), (ffrc(end)+ffrc(1)) ];
                     hfitplot(l).txt = text( 'Parent', handles.hgraph, 'interpreter', 'latex', 'String', str, ...
                 'Units', 'data', 'Position', pos, 'Margin', 1, 'FontUnits','normalized',...
                 'LineStyle','none', 'HitTest','off','FontSize',handles.fitfontsize, 'FontWeight','bold','Color','red',...
                 'VerticalAlignment','middle');
-                    hfitplot(l).ph = plot(handles.hgraph, int, ffrc, 'r', 'HitTest', 'off');
+                    hfitplot(l).ph = plot(handles.hgraph, xdata(l).data, ffrc, 'r', 'HitTest', 'off');
                 case 'plat'
                     sf = backdoorObj.edgeDetectionKernelSemiframes;         % default 10
-                    if numel(int) < (2*sf + 5)      % require at least 4 points with analysis
+                    if numel(xdata(l).data) < (2*sf + 5)      % require at least 4 points with analysis
                         warndlg('Interval is too short for analysis','Insufficient data', 'replace');
                         return;
                     end
-                    locint = int(sf:end-sf);                % crop the ends; dfrc at those frames would be padded
-                    sw = 2 * handles.kernelWidth^2;                 % denominator of Gaussian
+                    locint = xdata(l).data(sf:end-sf);      % crop the ends; dfrc at those frames would be padded
+                    sw = 2 * handles.kernelWidth^2;         % denominator of Gaussian
                     dom = -sf:sf;                           % domain (in number of frames)
                     gauss = exp(-dom.^2/sw);                % the gaussian
                     dgauss = diff(gauss);                   % differentiating gaussian kernel to get edge detector
-                    dfrc = abs(conv(frc(:,l),dgauss,'valid'));   % differentiating the force; keeping only unpadded values
+                    dfrc = abs(conv(ydata(l).data,dgauss,'valid'));   % differentiating the force; keeping only unpadded values
                     thresh = handles.noiseThresh*std(dfrc);         % threshold for noise
                     ffrc = (dfrc < thresh);                 % any slope below noise is plateaux
                     limits = [0,0];
                     
-                    if ~exist('plateaux','var'); plateaux(1).limits = limits; end;
+                    if ~exist('plateaux','var') || isempty(plateaux)
+                        plateaux(1).limits = limits;
+                    else
+                        plateaux(end+1).limits = limits;
+                    end;
                     
                     for i=1:numel(ffrc)
                         if (ffrc(i) && limits(1) == 0)      % plateau and not counting yet; first frame
                             if i > sf; limits(1) = i; end;  % plateau can't start in a padded zone
-                        elseif ( (ffrc(i) && i < numel(ffrc)) && limits(1) ~= 0)     % plateau and counting; add a frame
+                        elseif ( (ffrc(i) && i < numel(ffrc)) && limits(1) ~= 0)    % plateau and counting; add a frame
                             limits(2) = i;
                         elseif ( (~ffrc(i) || i==numel(ffrc)) && limits(1) ~= 0)    % not plateau and counting; the last frame
-                            if (limits(2) - limits(1)) > handles.minLength;                 % if plateau long enough
+                            if (limits(2) - limits(1)) > handles.minLength;         % if plateau long enough
                                 plateaux(end).limits = limits;                      % add to list
                                 plateaux(end+1).limits = [0,0];                     % new default range
                             end
-                            limits = [0, 0];
+                            limits = [0,0];
                         end
-                    end                    
-                    if numel(plateaux); plateaux(end) = []; end;         % erase the last prepared
+                    end     
                     
+                    % erase the last prepared
+                    if numel(plateaux); plateaux(end) = []; end;         
+                    
+                    % testing if plateaux are under the contrast limit,
+                    % used for initial contrast analysis
                     if limit
-                        sub = (frc(:,l) < backdoorObj.contrastPlateauDetectionLimit);
+                        sub = (ydata(l).data < backdoorObj.contrastPlateauDetectionLimit);
                         dsub = diff(sub);
                         dsub_s = (find(dsub == 1)+1);
                         dsub_e = (find(dsub == -1));
@@ -1102,12 +1131,13 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                         end
                     end
                     
-                    fitted = frc(sf:end-sf,l);  % crop the fits to match data with frames
+                    % generally fitting plateaux
+                    fitted = ydata(l).data(sf:end-sf);  % crop the fits to match data with frames
                     for p=nextPlateau:numel(plateaux)
                         lim = plateaux(p).limits;
                         plateaux(p).avgfrc = mean( fitted(lim(1):lim(2)) );
                         if handles.thisPlot==1 && limit    % if there's limit on contrast
-                            if plateaux(p).avgfrc < backdoorObj.contrastPlateauDetectionLimit;
+                            if plateaux(p).avgfrc > backdoorObj.contrastPlateauDetectionLimit;
                                 continue;   % proceed to the next plateau
                             end;
                         end;
@@ -1337,19 +1367,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 'Parameters for force calculation', 'Review', 'Proceed', 'Review');
             if strcmp(choice,'Review'); return; end;
         end;
-        persistent hanot;
-        if ~isempty(hanot);hanot.delete;end;
         BFPobj.getParameters(handles.RBCradius, handles.CAradius, handles.PIPradius, handles.pressure);
         handles.stiffness = BFPobj.k;
-        stifferr  = BFPobj.Dk;
         handles.overLimit = BFPobj.getForce(handles.hgraph);
         handles.hlinearinfo.Enable = 'on';
-        if handles.overLimit;colour = 'red'; else colour = 'blue';end
-        strk = {strcat('$$ k = ', num2str(round(handles.stiffness)),' \frac{pN}{\mu m}$$'),...
-               strcat('$$ \Delta k = \pm' , num2str(round(stifferr)),' \frac{pN}{\mu m} $$')};
-        hanot = annotation( handles.hcalc, 'textbox', 'interpreter', 'latex', 'String', strk, ...
-            'Units', 'normalized', 'Position', [0,0.67,0.5,0.15], 'Margin', 0, ...
-            'LineStyle','none','FitBoxToText','off','Color',colour,'FontUnits','normalized');
         handles.toPlot = 4;
         handles.thisPlot = 4;
         handles.hgraphitem.Value = handles.thisPlot;
@@ -1358,7 +1379,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.thisRange = [handles.lowplot,handles.highplot];
         handles.hlowplot.String = num2str(handles.lowplot);
         handles.hhighplot.String = num2str(handles.highplot);
-        plotZeroLine();
+        plotZeroLine();     % mark line of zero force
+        makeStiffAnot();    % display RBC stiffness info
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};
     end
 
@@ -1750,7 +1772,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 
     % allows to select the pattern anchor
     function getpatsubcoor_callback(~,~)        
-        if ~isfield(handles.interval,'pattern');
+        if ~isfield(handles.interval,'pattern') || isempty(handles.interval.pattern);
             warndlg('Choose a pipette pattern first. Then select the anchor.','No pipette pattern selected','replace');
             return;
         end;
@@ -1870,7 +1892,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 
     % displays the pattern selected for the given interval
     function [hpatfig,hpataxes] = showintpattern_callback(~,~)
-        if ~isfield(handles.interval,'pattern');
+        if ~isfield(handles.interval,'pattern') || isempty(handles.interval.pattern);
             warn('Nothing to show. Select a pipette pattern first');
             return;
         end;
@@ -1884,9 +1906,13 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end;
     end
 
-    % get reference frame for the currentlu selected pattern
+    % get reference frame for the currently selected pattern
     function getrefframe_callback(~,~)
-        if isempty(handles.interval.pattern); return; end;
+        if (~isfield(handles.interval,'pattern') || ...
+            isempty(handles.interval.pattern));
+            warn('Please select the pipette pattern tip first.','Reference frame is pattern-specific');
+            return; 
+        end;
         [handles.interval.reference, handles.interval.patsubcoor,~] = ...     % validate the pattern
             validatepattern(handles.interval.pattern, handles.interval.reference, handles.interval.patsubcoor);
         handles.hrefframe.String = num2str(handles.interval.reference);
@@ -1905,7 +1931,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             return;
         end                 
         handles.interval.reference = val;
-        handles.hrefframe.String = num2str(val);
+        set(handles.hrefframe,'String', num2str(val), 'Callback', {@setrefframe_callback,val});
+        
     end
 
     % set the range of frames to track
@@ -1972,8 +1999,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 strjoin({'The',type,'radius detection failed, no changes were made.'}));
         end
         source.Callback = {@measureLength_callback,type};   % reset callback
-        str = strjoin({type,'radius:'});                     % reset string
-        str(1) = upper(str(1));
+        Type = type;
+        Type(1) = upper(type(1));
+        str = strcat('<HTML><center>',Type,'<br>radius:</HTML>');                     % reset string
         source.String = str;
         handles.selecting = false;
     end
@@ -1981,7 +2009,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % detects the RBC and measures its radius, using the TrackBead method
     function measureRBC_callback(source,~)
         if handles.selecting;   % make sure only one selection runs at a time
-            warning('select');
+            warn('select');
             return;
         else handles.selecting = true;  % set handles.selecting flag
         end;
@@ -2004,7 +2032,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             else
                 if RBCmet < handles.beadmetricthresh && handles.verbose
                     warn(strjoin({'The RBC was detected, but the strength of the detection',...
-                        'is rather low, with',num2str(RBCmet),'below the threshold of',...
+                        'is rather low, with',num2str(round(RBCmet,2)),'below the threshold of',...
                         num2str(handles.beadmetricthresh),'Review, if the detection appears correct.'}));
                 end;
                 hRBCshow = viscircles(handles.haxes,[RBCcoor(2),RBCcoor(1)],RBCradius_);
@@ -2019,7 +2047,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
         RBCpoint.delete;
         source.Callback = {@measureRBC_callback};   % restore callback
-        source.String = 'RBC radius:';
+        source.String = '<HTML><center>RBC<br>radius:</HTML>';
         pause(2);   % wait, so the user can see the RBC outline
         if exist('hRBCshow','var'); hRBCshow.delete; end;       % delete the RBC outline (if created)
         handles.selecting = false;  % remove handles.selecting flag
@@ -2028,9 +2056,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % set experimental parameters; validate input
     function setexpdata_callback(source,~,oldval)
         input = str2double(source.String);
-        if isnan(input)
+        if isnan(input) || input < 0 
             source.String = num2str(oldval);
-            warndlg('Input must be of type double','Incorrect input', 'replace');
+            warndlg('Input must be a positive number of type double','Incorrect input', 'replace');
             return;
         end
         handles.pressure = str2double(handles.hpressure.String);
@@ -2038,6 +2066,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.PIPradius = str2double(handles.hPIPrad.String);
         handles.CAradius = str2double(handles.hCArad.String);
         handles.P2M = str2double(handles.hP2M.String);
+        source.Callback = {@setexpdata_callback,input};
     end
 
     % set pipette tracking grace period
@@ -2481,14 +2510,19 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 handles.hmoviebar.SliderStep = [ 1/vidObj.Frames, 0.1 ];
                 setframe(1);
                 setvidinfo();
+                handles.interval = struct('frames', [1,1],'pattern',[]);    % reset interval-in-making
                 handles.interval.frames = [1,vidObj.Frames];    % set initial interval and callback parameters
                 set(handles.hstartint, 'String', num2str(handles.interval.frames(1)),...
                     'Callback',{@setintrange_callback,handles.interval.frames(1),1});
                 set(handles.hendint, 'String', num2str(handles.interval.frames(2)),...
                     'Callback',{@setintrange_callback,handles.interval.frames(2),2});
+                handles.hrefframe.String = [];
+                handles.hpatsubcoor.String = '[.,.]';
+                set([handles.hpatternint,handles.hbeadint],'String','[.,.;.]');
                 set([handles.hgetbead, handles.hselectbead],'Enable','on'); % enable selections
                 set([handles.hdispframe,handles.hstartint,handles.hendint,handles.hshowframe,handles.hrefframe],'Enable','on');
                 set([handles.hplaybutton,handles.hrewindbtn,handles.hffwdbutton,handles.hcontrast],'Enable','on');
+                handles.haddinterval.Enable = 'off';
             catch
                 % issue warning of incompatible file
                 warndlg(strjoin({'The specified file at', handles.videopath, 'exists, but could not be openned.',char(10),...
@@ -2578,10 +2612,12 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
             end
 
-            handles.hgetpatsubcoor.Enable = 'on';
-            handles.hshowpattern.Enable = 'on';
-            handles.haddinterval.Enable = 'on';
-            handles.hgetrefframe.Enable = 'on';
+            if strcmp(tag,'interval')
+                handles.hgetpatsubcoor.Enable = 'on';
+                handles.hshowpattern.Enable = 'on';
+                handles.haddinterval.Enable = 'on';
+                handles.hgetrefframe.Enable = 'on';
+            end
             pass = true;
             
         catch
@@ -2834,7 +2870,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             % ===============================
         
             DF = frc(end) - frc(1);     % change in force
-            int = (int - int(1))/rate;         % start time at 0
+            int = (int - int(1))/rate;  % start time at 0
             
             initau = 1;                 % initial time constant guess
             model = @expfun;            % model exp function handle
@@ -2954,6 +2990,22 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             'FontSize',handles.labelfontsize,'Margin',5,'HitTest','off');
     end
 
+    % generates RBC stiffness annotation after the force was run
+    function makeStiffAnot()
+        if isempty(BFPobj)||isempty(BFPobj.k)
+            warn('RBC stiffness information can be generated only after the force has been calculated');
+            return;
+        end;
+        persistent hanot;
+        if ~isempty(hanot);hanot.delete;end;
+        if handles.overLimit;colour = 'red'; else colour = 'blue';end
+        strk = {strcat('$$ k = ', num2str(round(handles.stiffness)),' \frac{pN}{\mu m}$$'),...
+               strcat('$$ \Delta k = \pm' , num2str(round(BFPobj.Dk)),' \frac{pN}{\mu m} $$')};
+        hanot = annotation( handles.hcalc, 'textbox', 'interpreter', 'latex', 'String', strk, ...
+            'Units', 'normalized', 'Position', [0,0.67,0.5,0.15], 'Margin', 0, ...
+            'LineStyle','none','FitBoxToText','off','Color',colour,'FontUnits','normalized');
+    end
+
     function saveEnvironment(fileName)
         % GUI settings
         for dat = 1:numel(GUIdata)
@@ -2990,10 +3042,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
         in = load(fileName);
         
-        % GUI data
-        for elm = 1:numel(GUIdata)
-            handles.(GUIdata{elm}) = in.outgoing.GUIdata.(GUIdata{elm});
-        end
+        handles.videopath = in.outgoing.GUIdata.videopath;
         
         % open video -- sets up GUI values, which will be later modified
         % generates vidObj object, the video wrapper, based on the imported
@@ -3008,6 +3057,11 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
         backdoorObj = BFPGUIbackdoor(@backdoorFunction);    % preconstruct object connected to bd-function
         BFPobj = [];    % preconstruct empty object
+        
+        % GUI data
+        for elm = 1:numel(GUIdata)
+            handles.(GUIdata{elm}) = in.outgoing.GUIdata.(GUIdata{elm});
+        end
         
         makeTab();                  % generates tab of selected intervals
         handles.selecting = false;  % selection processes are not imported
@@ -3031,6 +3085,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         vidObj = in.outgoing.GUIobj.vidObj;    % update the pre-generated object
         BFPobj = in.outgoing.GUIobj.BFPobj;
         backdoorObj = in.outgoing.GUIobj.backdoorObj;
+        
+        % generate stiffness annotation
+        if ~isempty(BFPobj) && ~isempty(BFPobj.k); makeStiffAnot(); end;
 
         
     end
