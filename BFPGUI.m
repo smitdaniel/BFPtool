@@ -761,12 +761,23 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                         lines = findobj(handles.hgraph,'type','line');  % get lines in the graph
                         graphData = []; % declare
                         switch handles.thisPlot
-                            case 1          % contrast
+                            case 1          % contrast; any non-contrast line is discarded! (e.g. fit lines)
                                 graphData.name = putFileName('contrastGraph.dat');
-                                graphData.coor(:,1) = lines.XData;
-                                graphData.coor(:,2) = lines.YData;                                
-                            case { 2, 3 }   % trajectories
-                                for child = 1:numel(lines)
+                                if numel(lines) > 1;    % contrast should be a single line
+                                    tcont = vidObj.getContrastByFrame(handles.thisRange(1));
+                                    for child = 1:numel(lines)
+                                        if lines(child).YData(1) ==  tcont;
+                                            graphData.coor(:,1) = lines(child).XData;
+                                            graphData.coor(:,2) = lines(child).YData;
+                                            break;
+                                        end
+                                    end
+                                else
+                                    graphData.coor(:,1) = lines.XData;
+                                    graphData.coor(:,2) = lines.YData;
+                                end                                                               
+                            case { 2, 3 }   % trajectories and metrics
+                                for child = 1:numel(lines)  % 2 lines
                                     
                                     if ~isempty(lines(child).ZData)
                                         graphData(child).coor(:,1) = get(lines(child),'ZData');
@@ -787,8 +798,23 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                 graphData.name = putFileName('forceGraph.dat');
                                 graphData.coor(:,1) = lines.XData;
                                 graphData.coor(:,2) = lines.YData;
+                            case 5  % metrics
+                                tmetrics = BFPobj.getByFrame(handles.thisRange(1),'metric'); % read values for the first frame
+                                for child = 1:numel(lines)  % 2 lines
+                                    graphData(child).coor(:,1) = lines(child).XData;
+                                    graphData(child).coor(:,2) = lines(child).YData;                                    
+                                    if graphData(child).coor(1,2) == tmetrics(1);
+                                        graphData(child).name = putFileName('beadmetricGraph.dat');
+                                    elseif graphData(child).coor(1,2) == tmetrics(2);
+                                        graphData(child).name = putFileName('pipmetricGraph.dat');
+                                    else
+                                        warn('Export failed, graph could not be matched with underlying data');
+                                        graphData = []; % delete
+                                        return;         % and abort
+                                    end
+                                end
                         end
-                        for child = 1:numel(lines)
+                        for child = 1:numel(graphData)
                             dlmwrite(graphData(child).name, graphData(child).coor);
                         end
                     end
