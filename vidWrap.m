@@ -28,8 +28,12 @@ classdef vidWrap < handle
         CurrentFrame = 0;
         
         % supplementary data
-        Contrast = [];  % contrast as standard deviation
+        Contrast = [];  % contrast as standard deviation SD2
         GrayLvl = [];   % contrast as a mean intensity level
+        LocContrast = [];   % local contrast; rolling variance of SD2
+        
+        % contrast calculation parameters
+        rollVarWidth = 40;  % width of rolling variance of contrast
         
     end
 
@@ -60,8 +64,10 @@ classdef vidWrap < handle
                 obj.vidObj.setDirectory(1);
                 obj.CurrentFrame = 1;
                 
-                obj.Duration  = -1;
-                obj.Framerate = -1;
+                % default values for now
+                obj.Duration  = obj.Frames;
+                obj.Framerate = 1;
+                
             else
                 obj.istiff = false;
                 obj.vidObj = VideoReader(obj.videopath);
@@ -155,26 +161,35 @@ classdef vidWrap < handle
                 end
 
                 % normalize; values for contrast and mean-gray are only
-                % positive; if they're 0, report suspicion even
+                % positive; if they're 0, report suspicion event
                 maxContrast = max(obj.Contrast);
                 maxGrayLvl  = max(obj.GrayLvl);
                 
+                obj.getLocalContrast();
+                maxLocContrast = max(obj.LocContrast);
+                
                 if maxContrast ~= 0
-                    obj.Contrast = obj.Contrast/max(obj.Contrast);
+                    obj.Contrast = obj.Contrast/maxContrast;
                 else
                     warning('The values of contrast measure are suspicious (max=0). Please double check your video.');
                 end;
                 
                 if maxGrayLvl ~= 0
-                    obj.GrayLvl  = obj.GrayLvl/max(obj.GrayLvl);
+                    obj.GrayLvl  = obj.GrayLvl/maxGrayLvl;
                 else
-                    warning('The values of mean gray level are suspicions (max=0). Please double check your video.')
+                    warning('The values of mean gray level are suspicions (max=0). Please double check your video.');
                 end
 
+                if maxLocContrast ~= 0
+                    obj.LocContrast = obj.LocContrast/maxLocContrast;
+                else
+                    warning('The values of local (rolling) contrast are suspicions (max=0). Please double check your video.');
+                end
                 obj.readFrame(oldFrame);    % reset the original image
             end;
             
-            contrast = obj.Contrast;
+            %contrast = obj.Contrast;
+            contrast = obj.LocContrast;
             meanGray = obj.GrayLvl;
             if exist('hwaitbar','var');delete(hwaitbar); end;
 
@@ -190,7 +205,28 @@ classdef vidWrap < handle
             
         end
         
-
+        % calculate rolling variance of the constrast measure SD2
+        % TODO: this method should be private, as it uses data first
+        % calculated by the getContrast method
+        function [ ] = getLocalContrast(obj)
+            ww = 2*round(obj.rollVarWidth/2);   % window width, even
+            frms = numel(obj.Contrast);         % number of frames w/ SD2
+            
+            rMean = mean(obj.Contrast(1:ww));   % initial mean and variance
+            rVar  = var(obj.Contrast(1:ww));
+            obj.LocContrast(1:ww/2) = sqrt(rVar);
+            
+            for ind = 1:frms-ww
+                oMean = rMean;  % save old rolling mean
+                rMean = rMean - (obj.Contrast(ind) - obj.Contrast(ind+ww))/ww;    % update the mean
+                rVar  = rVar - (obj.Contrast(ind)-obj.Contrast(ind+ww))*...
+                        (obj.Contrast(ind+ww)-rMean+obj.Contrast(ind)-oMean)/(ww-1);    % update the variance
+                obj.LocContrast(ww/2+ind) = sqrt(rVar);
+            end
+            
+            obj.LocContrast(frms-ww/2+1:frms) = obj.LocContrast(frms-ww/2);  % pad the remaining arrayfields
+           
+        end
         
         % return value of contrast at particular frame
         function [contrastfrm] = getContrastByFrame(obj,frm)
@@ -202,6 +238,97 @@ classdef vidWrap < handle
         % verify and convert to gray; 
         function [cdata] = setGray(~,cdata)
             if (size(cdata,3) ~= 1); cdata = rgb2gray(cdata); end
+        end
+        
+        % querry user to provide a framerate for TIFF file
+        function db = getFramerate(obj)
+            inputype = 1;
+            inputval = -1;
+            boxstr = 'input value';
+            db = dialog('Units','normalized','Position',[0.25 0.25 0.5 0.5], 'Name',...
+                'No timestamps in TIFF file', 'WindowStyle', 'modal', 'CloseRequestFcn',@closedb_callback,...
+                'Resize','on');
+            txt = uicontrol('Parent', db, 'Style', 'text', 'Units', 'normalized',...
+                'Position', [0.1 0.6 0.8 0.4], 'String', strjoin({'The TIFF file imported does not',...
+                'contain information about the time length of the video or its framerate. Please provide,'...
+                'the information below. If You cannot acquire such information, please make a calibration',...
+                'of You own choice.'}),'HorizontalAlignment','left');
+            bg = uibuttongroup('Parent', db, 'Units', 'normalized', 'Position', [0.1 0.3 0.8 0.3],...
+                'SelectionChangedFcn', {@rb_callback});
+            rFR= uicontrol('Parent',bg, 'Style', 'radiobutton', 'String', 'Framerate [FPS]',...
+                'Units','normalized', 'Position', [0.1 0.5 0.8 0.5], 'Value', 1);
+            rTD= uicontrol('Parent',bg, 'Style', 'radiobutton', 'String', 'Time duration [s]',...
+                'Units', 'normalized', 'Position', [0.1 0 0.8 0.5], 'Value', 0);
+            bg.SelectedObject = rFR;
+            inputxt = uicontrol('Parent',db,'Style','text','Units','normalized',...
+                'Position', [0 0.1 0.3 0.2], 'String', 'Framerate:');
+            inputbox = uicontrol('Parent',db,'Style','edit','String',boxstr,...
+                'Units','normalized','Position', [0.3 0.1 0.3 0.2],'Callback',{@read_callback,boxstr});
+            sendbtn = uicontrol('Parent',db,'Style','pushbutton','String','Send','Enable','off',...
+                'Units','normalized','Position', [0.6 0.1 0.3 0.2], 'Callback',  @send_callback);
+            set([txt,bg,rFR,rTD,inputxt,inputbox,sendbtn], 'FontUnits', 'normalized');
+            
+            % radio buttons to switch between framerate and duration
+            function rb_callback(~,data)
+                if data.NewValue == rFR
+                    inputxt.String = 'Framerate [FPS]:';
+                    inputype= 1;
+                    sendbtn.Enable = 'on';
+                else
+                    inputxt.String = 'Duration [s]:';
+                    inputype= 2;
+                    sendbtn.Enable = 'on';
+                end
+            end
+            
+            % verify the value
+            function read_callback(src,~,oldval)
+                val = str2double(src.String);
+                if ~isnan(val) && (val>0)
+                    inputval = val;
+                    src.Callback = {@read_callback,num2str(val)};
+                    sendbtn.Enable = 'on';
+                else
+                    src.String = oldval;
+                    warndlg('Input must be a positive number of type double','Incorrect input', 'replace');
+                    return;
+                end
+            end
+            
+            % accept function
+            function send_callback(~,~)
+                if inputype == 1    % case of framerate
+                    if ~isnan(inputval) && (inputval > 0)
+                        obj.Framerate = inputval;
+                        obj.Duration = obj.Frames/obj.Framerate; % duration in seconds
+                    else
+                        warndlg('Input must be a positive number of type double','Incorrect input', 'replace');
+                        return;
+                    end
+                else
+                    if ~isnan(inputval) && (inputval > 0)
+                        obj.Duration = inputval;
+                        obj.Framerate = obj.Frames/obj.Duration; % framerate in FPS
+                    else
+                        warndlg('Input must be a positive number of type double','Incorrect input', 'replace');
+                        return;
+                    end
+                end
+                db.delete;  % delete the dialog
+            end
+            
+            % attempt to close the dialog prematurely
+            function closedb_callback(~,~)
+                choice = questdlg(strcat('No input was passed. Failsafe values will be used -- framerate of 1 FPS.',...
+                    'Do You want to close this window anyway?'),'No framerate information','Yes','No','No');
+                switch choice
+                    case 'Yes'
+                        db.delete;  % delete dialog box
+                    case 'No'
+                        return;     % keep open and return
+                end
+            end
+            
         end
         
         

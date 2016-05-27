@@ -705,6 +705,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     assignin('base','beadPositions',BFPobj.beadPositions);
                 elseif tar==2   % datafiles
                     fileName = putFileName('force.dat');
+                    if isequal(fileName,0); return; end;    % return if cancelled
                     force = zeros(BFPobj.trackedFrames,2);  % prealocate
                     i=1;
                     for frm=BFPobj.minFrame:BFPobj.maxFrame
@@ -713,6 +714,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     end
                     dlmwrite(fileName, force);
                     fileName = putFileName('pipPositions.dat');
+                    if isequal(fileName,0); return; end;    % return if cancelled
                     pipPos = zeros(BFPobj.trackedFrames,3);
                     i=1;
                     for frm=BFPobj.minFrame:BFPobj.maxFrame
@@ -721,6 +723,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     end
                     dlmwrite(fileName, pipPos);
                     fileName = putFileName('beadPositions.dat');
+                    if isequal(fileName,0); return; end;    % return if cancelled
                     beadPos = zeros(BFPobj.trackedFrames,3);
                     i=1;
                     for frm=BFPobj.minFrame:BFPobj.maxFrame
@@ -742,6 +745,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     set(hnewaxes, 'Units','normalized','OuterPosition',[0,0,1,1]);  % save access, fill the whole figure
                     colormap(hnewaxes,gray);            % makes sure colormap is gray
                     fileName = putFileName('frame.bmp');% call to set up filepath
+                    if isequal(fileName,0); return; end;    % return if cancelled
                     saveas(htempfig,fileName);          % save the trans. figure
                     delete(htempfig);
                 end
@@ -755,14 +759,23 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     assignin('base','BFPgraph',hexportfig);
                 elseif tar==2   % datafile
                     if isempty(handles.thisPlot); 
-                        if handles.verbose; helpdlg('Nothing to plot. Try to replot.','Empty graph');end;
+                        if handles.verbose; helpdlg('Nothing plotted. Try to replot.','Empty graph');end;
                         return;
                     else
+                        % delete descriptive line (these are not exported)
+                        if ~isempty(handles.hzeroline); handles.hzeroline.delete; end;
+                        if ~isempty(handles.pushtxt); handles.pushtxt.delete; end;
+                        if ~isempty(handles.pulltxt); handles.pulltxt.delete; end;
                         lines = findobj(handles.hgraph,'type','line');  % get lines in the graph
-                        graphData = []; % declare
+                        if isempty(lines);  % abort if no graphlines
+                            warn('No data object to export found in the graph.'); 
+                            return;
+                        end;                            
+                        graphData = []; % declare, empty
                         switch handles.thisPlot
                             case 1          % contrast; any non-contrast line is discarded! (e.g. fit lines)
                                 graphData.name = putFileName('contrastGraph.dat');
+                                if isequal(graphData.name,0); return; end;    % return if cancelled
                                 if numel(lines) > 1;    % contrast should be a single line
                                     tcont = vidObj.getContrastByFrame(handles.thisRange(1));
                                     for child = 1:numel(lines)
@@ -789,13 +802,16 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                     
                                     if graphData(child).coor(1,2:3) == BFPobj.getByFrame(handles.thisRange(1),'bead');
                                         graphData(child).name = putFileName('beadGraph.dat');
+                                        if isequal(graphData(child).name,0); return; end;    % return if cancelled
                                     elseif graphData(child).coor(1,2:3) == BFPobj.getByFrame(handles.thisRange(1),'pipette');
                                         graphData(child).name = putFileName('pipGraph.dat');
+                                        if isequal(graphData(child).name,0); return; end;    % return if cancelled
                                     end
                                     
                                 end
                             case 4  % force
                                 graphData.name = putFileName('forceGraph.dat');
+                                if isequal(graphData.name,0); return; end;    % return if cancelled
                                 graphData.coor(:,1) = lines.XData;
                                 graphData.coor(:,2) = lines.YData;
                             case 5  % metrics
@@ -805,8 +821,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                     graphData(child).coor(:,2) = lines(child).YData;                                    
                                     if graphData(child).coor(1,2) == tmetrics(1);
                                         graphData(child).name = putFileName('beadmetricGraph.dat');
+                                        if isequal(graphData(child).name,0); return; end;    % return if cancelled
                                     elseif graphData(child).coor(1,2) == tmetrics(2);
                                         graphData(child).name = putFileName('pipmetricGraph.dat');
+                                        if isequal(graphData(child).name,0); return; end;    % return if cancelled
                                     else
                                         warn('Export failed, graph could not be matched with underlying data');
                                         graphData = []; % delete
@@ -823,6 +841,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     hnewaxes = copyobj(handles.hgraph,htempfig);
                     set(hnewaxes, 'Units','normalized','OuterPosition',[0,0,1,1]);  % save access, fill the whole figure
                     fileName = putFileName('BFPgraph.fig'); % call to set up filepath
+                    if isequal(fileName,0); return; end;    % return if cancelled
                     saveas(htempfig,fileName);              % save the trans. figure
                     delete(htempfig);
                 end
@@ -831,6 +850,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 if tar==1       % workspace - no action
                 elseif tar==2   % datafile (here .mat file)
                     fileName = putFileName('BFPparameters.mat');
+                    if isequal(fileName,0); return; end;    % return if cancelled
                     saveEnvironment(fileName);     % saves the whole workspace (all variables) to the file
                 elseif tar==3   % figure/image - no action
                 end                  
@@ -972,16 +992,18 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         persistent hfitplot;
         persistent hsublimplot;
         if numel(hfitplot); 
-            for p=1:numel(hfitplot); 
-                hfitplot(p).ph.delete;
+            for p=1:numel(hfitplot);    % erase graphical elements from ...
+                hfitplot(p).ph.delete;  % ... the plotter area
                 hfitplot(p).txt.delete;
             end;
+            hfitplot = [];              % clear now empty structure
         end
         if numel(hsublimplot); 
             for p=1:numel(hsublimplot); 
                 hsublimplot(p).ph.delete;
                 hsublimplot(p).txt.delete;
             end;
+            hsublimplot = [];
         end
         
         if handles.thisPlot ~= 4 && handles.thisPlot ~= 1 && handles.thisPlot ~=5 && handles.thisPlot ~= 6
@@ -1142,13 +1164,13 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                             if(subints(k,2)-subints(k,1) < backdoorObj.contrastPlateauDetectionLimitLength)
                                 subints(k,:) = [];  % erase too short sublimit intervals
                             else
-                                hsublimplot(k).ph = ...
+                                hsublimplot(end+1).ph = ...
                                 plot(handles.hgraph, subints(k,1):subints(k,2),...
                                 backdoorObj.contrastPlateauDetectionLimit*ones(1,subints(k,2)-subints(k,1)+1),...
                                 'b', 'HitTest', 'off','LineWidth',2);
                                 pos = [ 0.5*(subints(k,1)+subints(k,2)), backdoorObj.contrastPlateauDetectionLimit ];
                                 if (mod(k,2)==0); va='bottom'; else va='top';end;
-                                hsublimplot(k).txt = text( 'Parent', handles.hgraph, 'String', strcat('[',num2str(subints(k,1)),':',num2str(subints(k,2)),']'), ...
+                                hsublimplot(end).txt = text( 'Parent', handles.hgraph, 'String', strcat('[',num2str(subints(k,1)),':',num2str(subints(k,2)),']'), ...
                                 'Units', 'data', 'Position', pos, 'Margin', 1,'interpreter', 'latex', 'FontUnits','normalized', ...
                                 'LineStyle','none', 'HitTest','off','FontSize',handles.fitfontsize, 'Color','blue',...
                                 'VerticalAlignment',va, 'HorizontalAlignment','center');
@@ -1167,12 +1189,13 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                 continue;   % proceed to the next plateau
                             end;
                         end;
-                        hfitplot(p).ph = plot(handles.hgraph, locint(lim(1):lim(2)), plateaux(p).avgfrc*ones(1,lim(2)-lim(1)+1), 'r', 'HitTest', 'off','LineWidth',2);
+                        pOnScreen = numel(hfitplot)+1;  % make sure there are no gaps in line list
+                        hfitplot(pOnScreen).ph = plot(handles.hgraph, locint(lim(1):lim(2)), plateaux(p).avgfrc*ones(1,lim(2)-lim(1)+1), 'r', 'HitTest', 'off','LineWidth',2);
                         disp(strcat('Average plateau value [',num2str(locint(lim(1))),',',num2str(locint(lim(2))),']:',num2str(plateaux(p).avgfrc)) );
                         str = strcat(quant,num2str(round(plateaux(p).avgfrc,rnd)),units);
                         pos = [ 0.5*(locint(lim(1))+locint(lim(2))), plateaux(p).avgfrc ];
-                        if (mod(p,2)==0); va='bottom'; else va='top';end;
-                        hfitplot(p).txt = text( 'Parent', handles.hgraph, 'interpreter', 'latex', 'String', str, ...
+                        if (mod(pOnScreen,2)==0); va='bottom'; else va='top';end;
+                        hfitplot(pOnScreen).txt = text( 'Parent', handles.hgraph, 'interpreter', 'latex', 'String', str, ...
                         'Units', 'data', 'Position', pos, 'Margin', 1, 'FontUnits','normalized',...
                         'LineStyle','none', 'HitTest','off','FontSize',handles.fitfontsize, 'FontWeight','bold','Color','black',...
                         'VerticalAlignment', va, 'HorizontalAlignment','center');
@@ -2560,6 +2583,17 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     handles.hvideopath.String = handles.videopath;
                 end
             end
+            % this is run separately, to have fallback values in case the
+            % user cancels the dialog or does something unexpected, the try
+            % fails and the video doesn't open at all
+            if ~isempty(vidObj)     % object was successfully created
+                if vidObj.istiff    % from a TIFF file
+                    hfrd = vidObj.getFramerate();   % querry to obtain FR
+                    uiwait(hfrd);
+                    handles.hvidframerate.String = strcat('Framerate: ',num2str(vidObj.Framerate), ' fps');
+                    handles.hvidduration.String = strcat('Duration: ',num2str(vidObj.Duration),' s');
+                end
+            end
         end
     end
 
@@ -2938,7 +2972,12 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 [filename, dir] = uiputfile({'*.mat;','Mat-files (*.mat)'},...
                                 'Select a file for export',inipath);    % choose path and file for matlab export
         end
-        exportfile = fullfile(dir,filename);
+        if isequal(filename,0) || isequal(dir,0)
+            exportfile = 0;
+            dir = pwd;
+        else
+            exportfile = fullfile(dir,filename);
+        end
     end
 
     % function to set up path for a file to load
