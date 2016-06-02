@@ -37,7 +37,6 @@ classdef vidWrap < handle
         
     end
 
-
     methods
        
         % constructor, builds the video reader object and wraps it
@@ -189,7 +188,7 @@ classdef vidWrap < handle
             end;
             
             %contrast = obj.Contrast;
-            contrast = obj.LocContrast;
+            contrast = obj.Contrast;
             meanGray = obj.GrayLvl;
             if exist('hwaitbar','var');delete(hwaitbar); end;
 
@@ -331,6 +330,16 @@ classdef vidWrap < handle
             
         end
         
-        
+        % compare the properties of videos, to see if they are the same
+        function match = matchVideos(obj, vidObjToMatch)
+            match = struct('format',false,'width',false,'height',false,...
+                'frames',false,'result',false); % initial match structure
+            
+            match.format= strcmp(obj.Format, vidObjToMatch.Format);
+            match.width =(obj.Width  == vidObjToMatch.Width);
+            match.height=(obj.Height == vidObjToMatch.Height);
+            match.frames=(obj.Frames == vidObjToMatch.Frames);
+            match.result= (match.format && match.width && match.height && match.frames);   % if any is false, result is false
+        end
     end
 end

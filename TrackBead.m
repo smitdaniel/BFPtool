@@ -107,6 +107,8 @@ failcounter = 0;    % counts failed (empty) detections in a row
 frames = 1;         % start from the second frame, the first frame position is given
 frame = vidObj.readFrame(range(1));   % set the first frame;
 threshRelaxes = [0,0];  % how many times were thresholds relaxed, following poor contrast or metric
+rmax = size(frame.cdata,1); % number of image data rows
+cmax = size(frame.cdata,2); % number of image data columns
 
 % waitbar
 if tbSwitch     % do use WB
@@ -132,8 +134,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     if tbSwitch     % update WB, if any exists
         % check if flag to stop tracking is on or not
         if htrackbar.UserData.killTrack; 
-            vidObj.readFrame(range(1));                     % reset the first frame;
-            htrackbar.UserData.wereTracked = wereTracked;   % cancelled tracking, reset the counter
+            cleanBreak(true);
             return; 
         end;
         
@@ -143,11 +144,16 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
             num2str(round(trackedRatio*100)),'% of total.'});
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
         waitbar(trackedRatio,htrackbar,wbmsg);
-    end
-       
+    end       
     
     % ====  THE TRACKING PART   ====
     % search beads using both methods
+    if (box(2,1)-box(1,1) < radius(1)) || (box(2,2)-(box(1,2)) < radius(1)) % search subframe too small
+        cleanBreak(false);
+        error(strjoin({'A tracking subframe became too small at the frame', num2str(range(1) + frames - 1),...
+            'The bead strayed too close to the edge or the traking failed in the last few frames.'}));  % throw error and quit
+    end
+        
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));       % area to search for the circle
     [centre,rad,metric] = imfindcircles(subframe, radius, 'ObjectPolarity',contrast,...
         'Sensitivity',sensitivity,'Method','TwoStage','EdgeThreshold', edge);     % this method returns in [x,y] format
@@ -185,8 +191,9 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
                 'Consecutive failures: ', num2str(failcounter),'/',num2str(buffer)}));
             end;
         end
-    elseif(distance(1) == 0 && failcounter >= buffer)    % 'buffer' failures in a row, abort
-        error(strjoin({num2str(buffer),' consecutive failures, abort at frame', num2str(range(1) + frames - 1)}));
+    elseif(distance(1) == 0 && failcounter >= buffer)   % 'buffer' failures in a row, abort
+        cleanBreak(false);
+        error(strjoin({num2str(buffer),' consecutive failures, abort at frame', num2str(range(1) + frames - 1)}));  % throw error and quit
     else                                % detection successful, save new centre
         failcounter = 0;                % reset failcounter after a successful detection
         centre = centre(distance(1),:); % keep only the closest circle, still in [x,y]
@@ -236,8 +243,12 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     if metric < robust; badFrames(frames,:) = true; end;
 
     radius = [max(floor(rad-4),radius(1)), min(ceil(rad+4),radius(2))];     % modify the radius interval (not over 18)
-    box = [floor(centre - side); ceil(centre + side)];        % modify the bounding box for the next search
-
+    box = [floor(centre - side); ceil(centre + side)];                      % modify the bounding box for the next search
+    box(1,1) = max(box(1,1),1);         % do not let the box outside ...
+    box(1,2) = max(box(1,2),1);         % ... the frame field
+    box(2,1) = min(box(2,1),rmax);
+    box(2,2) = min(box(2,2),cmax);
+    
     frames = frames +1;            % increment the frame counter
     frame = vidObj.readFrame();    % read the next frame; frame no.2 during the first run
 
@@ -275,6 +286,13 @@ function [LP] = lastPosition()
     else
         LP = [inicoor(2),inicoor(1)];
     end
+end
+
+function [] = cleanBreak(user)
+    htrackbar.UserData.killTrack = true;            % kill tracking
+    vidObj.readFrame(range(1));                     % reset the first frame;
+    htrackbar.UserData.wereTracked = wereTracked;   % cancelled tracking, reset the counter    
+    if ~user; htrackbar.delete; end;
 end
   
 end

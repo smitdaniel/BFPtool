@@ -130,9 +130,8 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     
     % ====  INFO SECTION  ====
     if tbSwitch
-        if htrackbar.UserData.killTrack; 
-            vidObj.readFrame(range(1));   % reset the first frame;
-            htrackbar.UserData.wereTracked = wereTracked;  % cancelled tracking, reset the counter
+        if htrackbar.UserData.killTrack;
+            cleanBreak(true);   % killed by user
             return; 
         end;
         
@@ -148,6 +147,14 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     thisFrame = range(1)-1+frames;
     box = [ max(box(1,1),1), max(box(1,2),1); min(box(2,1),frameDim(1)), min(box(2,2), frameDim(2)) ];
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));   % area to search for the pipette
+    
+    % check if the presumed pattern is not out of field => failed tracking
+    if (any(size(subframe) < size(pipette) )) 
+        cleanBreak(false);
+        error(strjoin({'At frame', num2str(thisFrame), 'position of the detected pattern upper left anchor is',...
+            strcat('[',num2str(round(index(2))),',',num2str(round(index(1))),']'),'too near to the edge of the field.',...
+            'The pipette left the field or the tracking must have failed in a few preceding frames.'}));  % throw error (nobody catches)
+    end
     
     score = normxcorr2( pipette, subframe );    % compute normalized cross correlation, 2D; note returns with padding
     score = score( pipDim(1):end - pipDim(1) + 1, pipDim(2):end - pipDim(2) + 1);   % clip for only unpadded correlations
@@ -188,7 +195,8 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
                 scores(frames,:)   = 0;
                 continue;
             else
-                error(strjoin({num2str(buffer), 'consecutive failures, abort at frame', num2str(thisFrame)}));
+                cleanBreak(false);
+                error(strjoin({num2str(buffer), 'consecutive failures, abort at frame', num2str(thisFrame)}));  % throw error (nobody catches)
             end;
         end
     end;
@@ -403,13 +411,21 @@ end;
         elseif nargin == 1
             pix = varargin{1};
             if numel(pix) ~= 2; 
-                warning('Incorrect input in ''isIn'' function. Input must be a pair of indices, [row,col]');
+                warning('Incorrect input in ''isOut'' function. Input must be a pair of indices, [row,col]');
                 return;
             end
             out = (pix(1) <= 1 || pix(1) >= size(score,1) || pix(2) <=1 || pix(2) >= size(score,2));
         else
             warning('Incorrect input in ''isIn'' function. Input must be a pair of indices, [row,col]');
         end
+    end
+
+    % facilitate orderly exit, if detection goes wrong
+    function [] = cleanBreak(user)
+        htrackbar.UserData.killTrack = true;           % stop tracking 
+        vidObj.readFrame(range(1));                    % reset the first frame;
+        htrackbar.UserData.wereTracked = wereTracked;  % cancelled tracking, reset the counter
+        if ~user; htrackbar.delete; end;
     end
 
    

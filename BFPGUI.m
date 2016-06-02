@@ -403,7 +403,7 @@ handles.heraseint     = uicontrol('Parent',handles.hlistinterval,'Style','pushbu
 handles.hexpdata = uibuttongroup('Parent', handles.hfig, 'Title','Experimental parameters', 'Units','normalized',...
             'Position', [0.86,0.05,0.1,0.5],'Visible','off');
 handles.hprestxt    = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'String', 'Pressure:',...
-            'Units', 'normalized','Position', [0,0.6,0.5,0.2]);
+           'Units', 'normalized','Position', [0,0.6,0.5,0.2]);
 handles.hpressure   = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.pressure),...
             'Units', 'normalized','Position', [0.5,0.6,0.45,0.2],'Callback', {@setexpdata_callback,handles.pressure}); 
 handles.hRBCtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String','<HTML><center>RBC<br>radius:</HTML>',...
@@ -422,7 +422,7 @@ handles.hP2Mtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'St
             'Units', 'normalized','Position', [0,0.8,0.5,0.2]);
 handles.hP2M        = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.P2M),...
             'Units', 'normalized','Position', [0.5,0.8,0.45,0.2],'Callback', {@setexpdata_callback,handles.P2M});
-set([handles.hprestxt,handles.hRBCtxt,handles.hPIPtxt,handles.hCAtxt,handles.hP2Mtxt],'HorizontalAlignment','center','FontUnits','normalized');
+set([handles.hRBCtxt,handles.hPIPtxt,handles.hCAtxt,handles.hP2Mtxt],'HorizontalAlignment','center','FontUnits','normalized');
 set([handles.hpressure,handles.hRBCrad,handles.hPIPrad,handles.hCArad,handles.hP2M],'FontUnits','normalized');
 % ====================================================================
 
@@ -680,11 +680,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 if src==1       % workspace - no action
                 elseif src==2   % datafile (here .mat file)
                     fileName = getFileName('BFPparameters.mat');
-                    %origin = ancestor(handles.hfig,'figure');   % find the ancestor of the GUI
-                    %delete(origin);  
-                    %GUIdata = load(fileName);
                     loadEnvironment(fileName);
-                    %backdoorObj = GUIdata.backdoorObj;
                     assignin('base','BFPbackdoor',backdoorObj); % send the new backdoor to the base WS
                 elseif src==3   % figure/image - no action
                 end                  
@@ -2372,13 +2368,15 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end        
 
     % browse button to chose the file
-    function browsevideo_callback(~,~)
+    function [ validFile] = browsevideo_callback(~,~)
         [filename, pathname] = uigetfile({'*.avi;*.mp4;*.tiff;*tif','Video Files (*.avi,*.mp4,*.tiff)'},...
                                 'Select a video file',handles.videopath);
         if ~isequal(filename, 0)     % test validity of selected file; returned 0 if canceled
             handles.videopath = strcat(pathname,filename);
             handles.hvideopath.String = handles.videopath;
-            openvideo_callback;
+            validFile = openvideo_callback; % returns true is properly openned
+        else
+            validFile = false;  % return not-selected flag
         end
     end
 
@@ -2545,9 +2543,11 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
     % open video and set its parameters where necessary; update callbacks
-    function openvideo_callback(~,~)
+    function [newOpenned] = openvideo_callback(~,~)
+        newOpenned = false;
         if exist(handles.videopath,'file') ~= 2;    % i.e. path is not a path to a file
             warndlg('Path is incorrect or the file doesn''t exist','File inaccessible','replace');
+            return;
         else
             try
                 vidObj = vidWrap(handles.videopath);
@@ -2572,6 +2572,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 set([handles.hdispframe,handles.hstartint,handles.hendint,handles.hshowframe,handles.hrefframe],'Enable','on');
                 set([handles.hplaybutton,handles.hrewindbtn,handles.hffwdbutton,handles.hcontrast],'Enable','on');
                 handles.haddinterval.Enable = 'off';
+                handles.hvideopath.String = handles.videopath;  % if called without GUI (i.e. the path string not updated)
+                newOpenned = true;
             catch
                 % issue warning of incompatible file
                 warndlg(strjoin({'The specified file at', handles.videopath, 'exists, but could not be openned.',char(10),...
@@ -2586,7 +2588,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             % this is run separately, to have fallback values in case the
             % user cancels the dialog or does something unexpected, the try
             % fails and the video doesn't open at all
-            if ~isempty(vidObj)     % object was successfully created
+            if ~isempty(vidObj) || newOpenned     % a new object was successfully created
                 if vidObj.istiff    % from a TIFF file
                     hfrd = vidObj.getFramerate();   % querry to obtain FR
                     uiwait(hfrd);
@@ -3107,19 +3109,49 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
         in = load(fileName);
         
+        oldvideopath = handles.videopath;
+        oldvidobj = vidObj;     % [] if empty
         handles.videopath = in.outgoing.GUIdata.videopath;
         
         % open video -- sets up GUI values, which will be later modified
         % generates vidObj object, the video wrapper, based on the imported
-        % video information
-        if exist(handles.videopath,'file') ~= 2;    % i.e. path is not a path to a file
-            warndlg('Path to the video file is incorrect or the file doesn''t exist. Import aborted.',...
-                'File inaccessible','replace');
-            return;
-        else
-            disp('Video path points to a file, attempting to open.');
-            openvideo_callback();
+        % video information; 
+        % if the video file doesn't exist or it cannot be successfully
+        % opened, user can navigate to the proper file, if it fails as
+        % well, import is interrupted
+        if exist(handles.videopath,'file') ~= 2 || ~openvideo_callback();    % i.e. path is not a path to a file or openning fails
+            hwd = warndlg('Path to the video file is incorrect, the file doesn''t exist or is malformed. Please try to navigate to the appropriate file.',...
+                'File not found','replace');   
+            validFile = browsevideo_callback(); % attempt to browse and open the video
+            if ~validFile   % no valid video provided
+                handles.videopath = oldvideopath;   % restore old videopath
+                return;                             % if import failed, return
+            end
+            hwd.delete;
         end
+        
+        % generate matching structure
+        match = vidObj.matchVideos(in.outgoing.GUIobj.vidObj);     % test if videos seem the same (just verify width,height,#frames,format)
+        
+        % inform if videos match; copy calculated data if they do
+        if ~match.result
+            warndlg(strjoin({'The specified video doesn''t match the imported video. The matching procedure',...
+                'reported the following results:',char(10), 'width:', num2str(match.width), char(10),...
+                'height:',num2str(match.height), char(10), '#frames:', num2str(match.frames),  char(10),...
+                'format:',num2str(match.format), char(10), ...
+                'The former video will be reinstated (if any), and import will terminate'}));
+            vidObj = oldvidobj;                         
+            handles.videopath = oldvideopath;
+            handles.hvideopath.String = oldvideopath;
+        else
+            disp('The dimensions, format and frames# matches, importing contrast data.');
+            vidObj.Contrast     = in.outgoing.GUIobj.vidObj.Contrast;
+            vidObj.GrayLvl      = in.outgoing.GUIobj.vidObj.GrayLvl;
+            vidObj.LocContrast  = in.outgoing.GUIobj.vidObj.LocContrast;
+            vidObj.Duration     = in.outgoing.GUIobj.vidObj.Duration;
+            vidObj.Framerate    = in.outgoing.GUIobj.vidObj.Framerate;
+        end
+        
         backdoorObj = BFPGUIbackdoor(@backdoorFunction);    % preconstruct object connected to bd-function
         BFPobj = [];    % preconstruct empty object
         
@@ -3147,7 +3179,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end           
 
         % objects
-        vidObj = in.outgoing.GUIobj.vidObj;    % update the pre-generated object
+        %vidObj = in.outgoing.GUIobj.vidObj;    % object already duplicated
         BFPobj = in.outgoing.GUIobj.BFPobj;
         backdoorObj = in.outgoing.GUIobj.backdoorObj;
         
