@@ -4,7 +4,7 @@
 %   calculate forces. It performs many mainainance tasks (e.g. basic
 %   fitting, measurements, fine-tuning of the detection, and import-export
 %   tools.
-%   OUT:
+%   OUT: 
 %   backdoorObj: is a handle class object, which is connected to some of
 %   the important parameters within the BFPClass and BFPGUI. It allows user
 %   to change these parameters from the Matlab command line. It is usually
@@ -106,18 +106,19 @@ handles.updpatframe = 0;    % pipette pattern originating frame, updated during 
 handles.calibint = [];      % single-frame interval in case a calibration frame needs to be set up
 
 % plotting and fitting settings
-handles.lowplot = 1;        % lower bound of plotted data
-handles.highplot = 10;      % upper bound of plotted data
-handles.toPlot = 1;         % quantity to be plotted (1=contrast, 2=track (3D), 3=trajectories (2D), 4=force, 5=metrics)
-handles.thisPlot = [];      % quantity currently displayed in the handles.hgraph (+6=outer graph)
-handles.thisRange = [];     % current range of frames of the plot
-handles.fitInt = [];        % interval of data to which apply the fitting procedure
+handles.lowplot     = 1;    % lower bound of plotted data
+handles.highplot    = 10;   % upper bound of plotted data
+handles.toPlot      = 1;    % quantity to be plotted (1=contrast, 2=track (3D), 3=trajectories (2D), 4=force, 5=metrics)
+handles.thisPlot    = [];   % quantity currently displayed in the handles.hgraph (+6=outer graph)
+handles.thisRange   = [];   % current range of frames of the plot
+handles.fitInt      = [];   % interval of data to which apply the fitting procedure
 handles.kernelWidth = 5;    % width of the differentiating kernel in plateau detection
 handles.noiseThresh = sqrt(2);  % multiple of derivative's std to be considered noise (pleatea)
 handles.minLength   = 30;   % minimal number of frames to constitute a plateau
 handles.hzeroline = [];     % handle of a line representing a zero force
 handles.pushtxt   = [];     % texthandle for a pushing region descriptor ...
 handles.pulltxt   = [];     % ... and the like for pulling region
+handles.contype   = 1;      % type of contrast metric to display (1=SD2, 2=rSD2; see documentation)
 
 % lists of UI handles for export/import; mutable handles
 GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
@@ -133,7 +134,7 @@ GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
         
 GUIflags.Values = {'hmoviebar', 'hpatternlist', 'hcorrthresh','hcontrasthresh', 'hbeadinilist',...
             'hsensitivitybar', 'hgradbar', 'hmetric','hgraphbead','hgraphpip','hverbose','hhideexp',...
-            'hhidelist','hhidedet', 'hdisptrack', 'hgraphitem'};
+            'hhidelist','hhidedet', 'hdisptrack', 'hgraphitem', 'hSD2', 'hrSD2'};
 
 GUIflags.Enables = {'hmoviebar', 'hplaybutton', 'hrewindbtn', 'hffwdbutton', ...
             'hcontrast', 'hgenfilm', 'hstartint', 'hshowframe', 'hendint', 'hrefframe',...
@@ -142,7 +143,7 @@ GUIflags.Enables = {'hmoviebar', 'hplaybutton', 'hrewindbtn', 'hffwdbutton', ...
             'hupdate','hruntrack','hrunforce','hgraphplot','hgraphitem','hgraphbead',...
             'hgraphpip','hlowplot','hhighplot','hreport','hlinearinfo','hfitline',...
             'hfitexp','hfitplateau','hplatwidth','hplatthresh','hplatmin','hexport',...
-            'himport',};
+            'himport'};
 
 GUIflags.Visibles = {'hpatterns', 'hbeadmethods', 'hpipdetection','hbeaddetection',...
             'hexpdata','hgetplatwidth','hgetplatthresh','hgetplatmin'};
@@ -158,7 +159,7 @@ GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ..
             'tmppatframe', 'interval', 'intervallist', 'remove', 'updpatframe',...
             'calibint', 'lowplot', 'highplot', 'toPlot', 'thisPlot', 'thisRange',...
             'fitInt', 'kernelWidth', 'noiseThresh', 'minLength', 'hzeroline',...
-            'pushtxt', 'pulltxt' };
+            'pushtxt', 'pulltxt', 'contype' };
         
         
 % ================= SETTING UP GUI CONTROLS =========================
@@ -292,8 +293,8 @@ set([handles.hpipbufftxt,handles.hpipbuffer],'FontUnits','normalized');
 % ================= BEAD DETECTION SETTINGS ==========================
 handles.hbeaddetection = uibuttongroup('Parent', handles.hfig, 'Title', 'Bead detection settings', 'Units', 'normalized',...
             'Position', [0.66, 0.05, 0.1, 0.24],'Visible','off');
-handles.hradtxt     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'text', 'String', 'Radius range',...
-            'Units', 'normalized','Position', [0,0.85,0.5,0.1]);
+handles.hradtxt     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'pushbutton', 'String','<HTML><center>Radius range</HTML>',...
+            'Units', 'normalized','Position', [0,0.85,0.5,0.15],'Callback',{@getradrange_callback,'beadrad'},'Enable','off');
 handles.hminrad     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'edit', 'String', num2str(handles.beadradius(1)),...
             'Units', 'normalized','Position', [0.5,0.85,0.2,0.15],'Callback', {@setrad_callback});
 handles.hmaxrad     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'edit', 'String', num2str(handles.beadradius(2)),...
@@ -478,9 +479,17 @@ handles.hreport      =   uicontrol('Parent', handles.hcalc,'Style','pushbutton',
 handles.hlinearinfo  =   uicontrol('Parent', handles.hcalc,'Style','pushbutton','String','<HTML><center><font size="3" color="black">?</font></HTML>',...
                 'Units','normalized','Position',[0,0.65,0.25,0.05],'Enable','off','Callback',{@lininfo_callback},...
                 'TooltipString','Information on reliability of linear approximation of force');
+% contrast type selection button group + radio buttons
+handles.hcontype     =   uibuttongroup('Parent', handles.hcalc, 'Units', 'normalized',...
+                'Position', [0.5,0.25,0.5,0.1],'SelectionChangedFcn', {@contype_callback});
+handles.hSD2         =   uicontrol('Parent', handles.hcontype, 'Style', 'radiobutton', 'Units','normalized',...
+                'String', 'SD2', 'Value', 1,'Position', [0,0.5,1,0.5]);
+handles.hrSD2         =   uicontrol('Parent', handles.hcontype, 'Style', 'radiobutton', 'Units','normalized',...
+                'String', 'rSD2', 'Value', 0, 'Position', [0,0,1,0.5]);
 set([handles.hupdate,handles.hruntrack,handles.hrunforce,handles.hgraphplot,...
     handles.hgraphitem,handles.hgraphbead,handles.hgraphpip,handles.hlowplot,...
-    handles.hhighplot,handles.hreport,handles.hlinearinfo],'FontUnits','normalized');
+    handles.hhighplot,handles.hreport,handles.hlinearinfo,handles.hcontype,...
+    handles.hSD2, handles.hrSD2],'FontUnits','normalized');
 % ====================================================================
 
 % ========================= BASIC FITTING ============================
@@ -773,7 +782,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                 graphData.name = putFileName('contrastGraph.dat');
                                 if isequal(graphData.name,0); return; end;    % return if cancelled
                                 if numel(lines) > 1;    % contrast should be a single line
-                                    tcont = vidObj.getContrastByFrame(handles.thisRange(1));
+                                    tcont = vidObj.getContrastByFrame(handles.thisRange(1),handles.contype);
                                     for child = 1:numel(lines)
                                         if lines(child).YData(1) ==  tcont;
                                             graphData.coor(:,1) = lines(child).XData;
@@ -1280,7 +1289,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         if (coor(1,1) < handles.hgraph.XLim(1) || coor(1,1) > handles.hgraph.XLim(2)); return; end; % ignore clicks outside the canvas
         if (handles.thisPlot == 1 || handles.thisPlot==4 || handles.thisPlot==5)
             if handles.thisPlot == 1;       % contrast
-                Ycoor = vidObj.getContrastByFrame(round(coor(1,1)));
+                Ycoor = vidObj.getContrastByFrame(round(coor(1,1)),handles.contype);
             elseif handles.thisPlot == 4;   % force
                 Ycoor = BFPobj.getByFrame(round(coor(1,1)),'force');
             elseif handles.thisPlot == 5;   % metrics
@@ -1433,7 +1442,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     function runtrack_callback(~,~)
         BFPobj.Track(handles.hgraph);       % run tracking
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};   % reset callback
-        set([handles.hrunforce,handles.hgraphplot,handles.hlowplot,handles.hhighplot,handles.hgraphbead,handles.hgraphpip, handles.hgraphitem,handles.hreport],'Enable','on');
+        set([handles.hrunforce,handles.hgraphplot,handles.hlowplot,handles.hhighplot,...
+            handles.hgraphbead,handles.hgraphpip, handles.hgraphitem,handles.hreport],'Enable','on');
         handles.toPlot = 2;
         handles.thisPlot = 2;
         handles.lowplot = max(BFPobj.minFrame,1);
@@ -2170,6 +2180,32 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         source.String = num2str(handles.beadbuffer);
     end
 
+    % get approximate range for MB radius interactively, in pixels
+    function getradrange_callback(source,~,tag)
+        
+        % set selection lock
+        if handles.selecting
+            warn('select');
+            return;
+        else
+            handles.selecting = true;
+        end
+        
+        % detect the bead
+        [beadinfo,pass,rad] = getBead(source,tag,'cbk',@getradrange_callback);
+        source.String = '<HTML><center>Radius range</HTML>';    % restore button string
+        
+        if isempty(beadinfo) || ~pass   % check if selection was success
+            handles.selecting = false;
+            return; 
+        end;        
+        handles.hminrad.String = num2str(0.5*rad);              % set new radii
+        handles.hmaxrad.String = num2str(1.5*rad);
+        setrad_callback(0,0);
+        handles.selecting = false;  % remove selection lock
+ 
+    end
+        
     % set limit on radius for the bead tracking; verify correct input
     function setrad_callback(~,~)
         vmin = str2double(handles.hminrad.String);
@@ -2427,11 +2463,17 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         if strcmp(srctag,'analysis')
             handles.lowplot = 1;                % initial frame
             handles.highplot = vidObj.Frames;   % final frame
+            if handles.contype ~= 1 % switch to SD2 metric for analysis
+                warn('Contrast metric type switched to SD2. There is no thresholding for rSD2 type metric');
+                handles.contype  = 1;
+                handles.hSD2.Value  = 1;
+                handles.hrSD2.Value = 0;
+            end
         end
         
         % returned 'contrast' all video frames, regardeless of subinterval
         % see function comment for details
-        [ contrast, ~ ] = vidObj.getContrast(handles.lowplot, handles.highplot);    
+        [ contrast, ~ ] = vidObj.getContrast(handles.lowplot, handles.highplot,handles.contype,backdoorObj.contrastRunningVarianceWindow);    
         if numel(contrast) ~= vidObj.Frames % if process of contrast calculation was cancelled
             handles.highplot = min(handles.lowplot+numel(contrast)-1, vidObj.Frames);
         end
@@ -2571,6 +2613,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 set([handles.hgetbead, handles.hselectbead],'Enable','on'); % enable selections
                 set([handles.hdispframe,handles.hstartint,handles.hendint,handles.hshowframe,handles.hrefframe],'Enable','on');
                 set([handles.hplaybutton,handles.hrewindbtn,handles.hffwdbutton,handles.hcontrast],'Enable','on');
+                handles.hradtxt.Enable = 'on';
                 handles.haddinterval.Enable = 'off';
                 handles.hvideopath.String = handles.videopath;  % if called without GUI (i.e. the path string not updated)
                 newOpenned = true;
@@ -2740,9 +2783,16 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     beadinfo.contrast = 'dark';
             end;
             beadpoint.delete;
+            
+            if strcmp(tag,'beadrad')      
+                defaultRad = [5,50];    % wide range to catch-all (nearly)
+            else
+                defaultRad = handles.beadradius;
+            end
+                
             [coor,rad,metric,~] = TrackBead(vidObj, beadinfo.contrast, beadinfo.coor,...
-                         [ beadinfo.frame, beadinfo.frame ], 'retries', 1 );  % try to detect the bead in the frame
-                    
+                         [ beadinfo.frame, beadinfo.frame ], 'radius', defaultRad, 'retries', 1 );  % try to detect the bead in the frame
+
             if rad == 0;    % stop if nothing is detected
                 warndlg(strjoin({'No bead was detected in the given vicinity for',beadinfo.contrast,'contrast.',...
                     'Please repeat Your selection, placing the search point within the desired bead',...
@@ -2753,7 +2803,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 return;     % kill the procedure
             end
                 
-            if metric < handles.beadmetricthresh;   % warn for weak detection; use glab metric thresh
+            if metric < handles.beadmetricthresh;   % warn for weak detection; use glob metric thresh
                     warn(strjoin({'The bead metric is only',num2str(metric),...
                     'which is below the threshold',num2str(handles.beadmetricthresh),...
                     'and detection failures can occur.'}));
@@ -2914,6 +2964,23 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                'ColumnWidth',{52},'CellEditCallback',@rmtabledint_callback);
     end
 
+    % radio button group selection change callback
+    % determines which type of contrast will be plot
+    function contype_callback(~,data)
+        if data.NewValue == handles.hSD2;
+            handles.contype = 1;    % plot SD2 contrast metric
+            disp('Contrast plot set to SD2 metric');
+        else
+            handles.contype = 2;    % plot running contrast metric
+            disp('Contrast plot set to rSD2 metric');
+        end
+        
+        % if contrast plot is and will be open; replot when changed type
+        if ~isempty(handles.thisPlot) && handles.thisPlot == 1 && handles.toPlot==1
+            graphplot_callback(0,0);
+        end                
+    end
+
     % fits data with one-parametric exponentiel
     function [ est, FitCurve ] = expfit( int, frc, varargin )
             
@@ -3016,7 +3083,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % depending on the 'handles.verbose' variable; Some warning messages are preset
     % otherwise, the passed string is displayed
     function warn( type, append )
-                
+        
         % construct the string
         switch type
             case 'select'
@@ -3038,7 +3105,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
        
         % display either the warining dialogue or command line warning
         if handles.verbose
-            warndlg(str, name, 'replace');
+            hdia = warndlg(str, name, 'replace');
+            uiwait(hdia);
         else
             warning(str);
         end            
@@ -3350,12 +3418,23 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 
     function [status] = backdoorFunction( action )
         status = false;
-        
+                
         switch action
-            case strcmp(action,'reselect')
+            case 'reselect'
                 handles.selecting = false;
                 warning(strjoin({'Selection lock removed. This function is intended only to',...
                     'help You recover after fatal error. Hope You know well, what You''re doing.'}));
+                status = true;
+            case 'deadwaitbar'
+                set(groot,'ShowHiddenHandles','on');
+                saleGosse = get(groot,'Children');
+                for f=numel(saleGosse):-1:1
+                    if strcmp(saleGosse(f).Tag, 'TMWWaitbar')
+                        saleGosse(f).delete;
+                    end
+                end
+                warning(strjoin({'Handles of the dead waitbars were killed. If You still see',...
+                    'them, then they be undead. Good luck to You!'}));
                 status = true;
         end
         

@@ -26,6 +26,8 @@ classdef BFPGUIbackdoor < handle
         contrastPlateauDetectionLength = 65;
         contrastPlateauDetectionLimitLength = 10;
         contrastPlateauDetectionLimit  = 0.95;
+        % parameter for running contrast SD calculation
+        contrastRunningVarianceWindow = 40;
         % video playing variables; step size for rewind and ffwd
         fastforwardFramerate = 5;
         rewindFramerate = -5;
@@ -60,6 +62,11 @@ classdef BFPGUIbackdoor < handle
         % sets 'selecting' variable in GUI to false
         function resetSelecting(obj)
             obj.backdoorFunctionHandle('reselect');
+        end
+        
+        % deletes dead waitbars (actually all waitbars)
+        function killDeadWaitbar(obj)
+            obj.backdoorFunctionHandle('deadwaitbar');
         end
         
         % testing if 'base' WS is connected to GUI

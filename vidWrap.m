@@ -124,12 +124,46 @@ classdef vidWrap < handle
         end
         
         % Procedure verifies, if the contrast exists for all frames of video,
-        % and if is unbroken (i.e. nonzero) in the requested interval. 
+        % and if is unbroken (i.e. nonzero) in the requested interval.
+        % IN: ffrm-lfrm = first frame to last frame requested
+        %     type = return (in var 'contrast') local contrast variance or
+        %     SD2 value for each frame
+        %     rVarWW = window width for local contrast variance; if this
+        %     changes, the rSD2 is recalculated on the function call
+        % OUT: contrast = metric (1=SD2, 2=rSD2)
+        %      meanGray = mean grayscale value of frames
         % Recalculates all frames if conditions are not met and returns
         % the FULL array 'contrast', not just the requested subinterval.
         % Returned array is truncated ONLY if the process is cancelled by
         % the user.
-        function [ contrast, meanGray ] = getContrast(obj, ffrm, lfrm)
+        function [ contrast, meanGray ] = getContrast(obj, ffrm, lfrm, varargin)
+            
+            inp = inputParser;
+            
+            defaultType     = 1;    % contrast SD2 code
+            defaultrVarWW   = obj.rollVarWidth; % default window width rSD2
+            
+            inp.addRequired('obj');
+            inp.addRequired('ffrm');    % initial requested frm
+            inp.addRequired('lfrm');    % final requested frm
+            inp.addOptional('type', defaultType, @isfloat);       % type of contrast metric
+            inp.addOptional('rVarWW', defaultrVarWW, @isfloat);   % width of the rSD2 window
+            
+            inp.parse(obj, ffrm, lfrm ,varargin{:});
+
+            obj = inp.Results.obj;
+            ffrm = inp.Results.ffrm;
+            lfrm = inp.Results.lfrm;
+            type = inp.Results.type;
+            rVarWW = inp.Results.rVarWW;
+            % ===========================================================
+            
+            if obj.rollVarWidth ~= rVarWW   % update rolling variance window width if needed
+                obj.rollVarWidth = rVarWW;
+                redorSD = true;
+            else
+                redorSD = false;
+            end
             % check if the requested interval was analysed (ffrm:lfrm),
             % redo analysis, if it wastn't, return current values otherwise
             % (this is usually for plotting function call)
@@ -185,10 +219,23 @@ classdef vidWrap < handle
                     warning('The values of local (rolling) contrast are suspicions (max=0). Please double check your video.');
                 end
                 obj.readFrame(oldFrame);    % reset the original image
+            elseif redorSD  % recalculate local contrast SD, if window width was changed
+                obj.getLocalContrast();
+                maxLocContrast = max(obj.LocContrast);
+                if maxLocContrast ~= 0
+                    obj.LocContrast = obj.LocContrast/maxLocContrast;
+                else
+                    warning('The values of local (rolling) contrast are suspicions (max=0). Please double check your video.');
+                end
             end;
             
-            %contrast = obj.Contrast;
-            contrast = obj.Contrast;
+            % select type of contrast to return
+            if type==1
+                contrast = obj.Contrast;
+            elseif type==2
+                contrast = obj.LocContrast;
+            end;
+            
             meanGray = obj.GrayLvl;
             if exist('hwaitbar','var');delete(hwaitbar); end;
 
@@ -228,9 +275,13 @@ classdef vidWrap < handle
         end
         
         % return value of contrast at particular frame
-        function [contrastfrm] = getContrastByFrame(obj,frm)
+        function [contrastfrm] = getContrastByFrame(obj,frm,type)
             if isempty(obj.Contrast); obj.getContrast; end;     % if contrast no calculated yet
-            contrastfrm = obj.Contrast(frm);
+            if type==1
+                contrastfrm = obj.Contrast(frm);
+            elseif type==2
+                contrastfrm = obj.LocContrast(frm);
+            end
         end
             
         
