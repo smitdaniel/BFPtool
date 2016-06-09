@@ -34,14 +34,6 @@ function [ backdoorObj ] = BFPGUI( varargin )
     
     loadData = inp.Results.loadData;
     
-    % if the data exist, re-start the saved instance and kill this run
-    if loadData; 
-        GUIdata = load(loadData);
-        backdoorObj = GUIdata.backdoorObj;
-        return;
-    end
-    
-            
 % ===================================================================
 
 
@@ -404,7 +396,7 @@ handles.heraseint     = uicontrol('Parent',handles.hlistinterval,'Style','pushbu
 handles.hexpdata = uibuttongroup('Parent', handles.hfig, 'Title','Experimental parameters', 'Units','normalized',...
             'Position', [0.86,0.05,0.1,0.5],'Visible','off');
 handles.hprestxt    = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'String', 'Pressure:',...
-           'Units', 'normalized','Position', [0,0.6,0.5,0.2]);
+           'Units', 'normalized','Position', [0,0.6,0.5,0.12]);
 handles.hpressure   = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.pressure),...
             'Units', 'normalized','Position', [0.5,0.6,0.45,0.2],'Callback', {@setexpdata_callback,handles.pressure}); 
 handles.hRBCtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String','<HTML><center>RBC<br>radius:</HTML>',...
@@ -419,11 +411,11 @@ handles.hCAtxt      = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton
             'Units', 'normalized','Position', [0,0,0.5,0.2],'Callback',{@measureLength_callback,'contact'});
 handles.hCArad      = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.CAradius),...
             'Units', 'normalized','Position', [0.5,0,0.45,0.2],'Callback', {@setexpdata_callback,handles.CAradius});
-handles.hP2Mtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'String', 'Pixel to micron:',...
-            'Units', 'normalized','Position', [0,0.8,0.5,0.2]);
+handles.hP2Mtxt     = uicontrol('Parent', handles.hexpdata, 'Style', 'pushbutton', 'String', '<HTML><center>Pixel to<br>micron:</HTML>',...
+            'Units', 'normalized','Position', [0,0.8,0.5,0.2],'Callback', {@measureLength_callback,'scale'});
 handles.hP2M        = uicontrol('Parent', handles.hexpdata, 'Style', 'edit', 'String', num2str(handles.P2M),...
             'Units', 'normalized','Position', [0.5,0.8,0.45,0.2],'Callback', {@setexpdata_callback,handles.P2M});
-set([handles.hRBCtxt,handles.hPIPtxt,handles.hCAtxt,handles.hP2Mtxt],'HorizontalAlignment','center','FontUnits','normalized');
+set([handles.hRBCtxt,handles.hPIPtxt,handles.hCAtxt,handles.hP2Mtxt,handles.hprestxt],'HorizontalAlignment','center','FontUnits','normalized');
 set([handles.hpressure,handles.hRBCrad,handles.hPIPrad,handles.hCArad,handles.hP2M],'FontUnits','normalized');
 % ====================================================================
 
@@ -568,7 +560,16 @@ handles.hhidedet = uicontrol('Parent',handles.hio,'Style','togglebutton','Min',0
 %            'String', 'Disclose', 'TooltipString', 'Pay no attention to that man behind the curtain',...
 %            'Callback', {@BDtest_callback});
 set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,handles.hhideexp,handles.hhidelist,handles.hhidedet],'FontUnits','normalized');
-            
+        
+% ============ LOAD OLDER SESSION PASSED AS ARGUMENT =================
+    % if the data exist, load the saved environment
+    % it is only called here, after the GUI is constructed
+    if loadData; 
+        loadEnvironment(loadData);
+    end
+% ====================================================================
+
+
 % ================= CALLBACK FUNCTIONS ===============================
 
     % mouse wheel action to advance or roll back the video frames
@@ -1057,9 +1058,11 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         eunits = '\; s^{-1}$$'; % the same for all cases
         
         % set fitting interval
-        if isempty(handles.fitInt); handles.fitInt = [ handles.hgraph.XLim(1), 0; handles.hgraph.XLim(2), 0] ; end;     % if none provided, select current graph limits
-        handles.hfitint.String = strcat('<HTML><center>Change<br>[',num2str(round(handles.fitInt(1,1))),',',...
-                         num2str(round(handles.fitInt(2,1))),']</HTML>');                       % save the info about the current fitting interval
+        if isempty(handles.fitInt); 
+            handles.fitInt = [ handles.hgraph.XLim(1), 0; handles.hgraph.XLim(2), 0] ;   % if none provided, select current graph limits
+            handles.hfitint.String = strcat('<HTML><center>Change<br>[',num2str(round(handles.fitInt(1,1))),',',...
+                         num2str(round(handles.fitInt(2,1))),']</HTML>');                % save the info about the current fitting interval
+        end
         
         iniInt = [handles.fitInt(1,1), handles.fitInt(2,1)];   % set the selected interval
         xdata = struct('data',[]);          % initialize variable for data range
@@ -1068,7 +1071,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         hplotline = findobj(handles.hgraph,'Type','line');  % find the data line
         for l = 1:numel(hplotline)
             xdata(l).data = (max(hplotline(l).XData(1),iniInt(1)):min(hplotline(l).XData(end),iniInt(2)))';
-            if isempty(xdata(l).data);
+            if isempty(xdata(l).data) || strcmp(hplotline(l).Tag,'intbound');
                 xdata(l).data = [];
                 ydata(l).data = [];
             else ydata(l).data = hplotline(l).YData(xdata(l).data - hplotline(l).XData(1)+1)';
@@ -1212,31 +1215,39 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 
     % select interval for fitting; make sure to catch exceptions
     function fitint_callback(~,~)
+        if handles.selecting;       % there is a strange interplay between uiwait/waitfor functions ...
+            warn('select');         % ...this approach is a bit awkward, but fail-safe
+            return;
+        else handles.selecting = true; 
+        end;
+        set([handles.hfitline,handles.hfitexp,handles.hfitplateau],'Enable','off'); % suspend fitting
         handles.hgraph.ButtonDownFcn = [];      % suppress button-down callback for the graph
         handles.hfitint.String = '<HTML><center>Accept<br>Interval</HTML>';
-        handles.hfitint.Callback = 'uiresume(gcbf)';
+        handles.hfitint.Tag = 'wait';
+        handles.hfitint.Callback = @(src,~)(set(src,'Tag','continue'));
         hold(handles.hgraph,'on');
         BCfunction = makeConstrainToRectFcn('impoint',get(handles.hgraph,'XLim'),get(handles.hgraph,'YLim'));
         Ymid = (handles.hgraph.YLim(2)+handles.hgraph.YLim(1))*0.5;
-        oldInt = handles.fitInt;
         if isempty(handles.fitInt)
             Xlen = handles.hgraph.XLim(2)-handles.hgraph.XLim(1);
             XC = [handles.hgraph.XLim(1)+0.25*Xlen, handles.hgraph.XLim(1)+0.75*Xlen];
+            oldInt = round( [handles.hgraph.XLim(1), 0;...
+                             handles.hgraph.XLim(2), 0] );
         else
+            oldInt = handles.fitInt;
             XC = [max(handles.fitInt(1,1),handles.hgraph.XLim(1)),min(handles.fitInt(2,1),handles.hgraph.XLim(2))];
         end 
         intpoint(1) = impoint(handles.hgraph,XC(1),Ymid,'PositionConstraintFcn',BCfunction);
         intpoint(2) = impoint(handles.hgraph,XC(2),Ymid,'PositionConstraintFcn',BCfunction);
         intpoint(1).addNewPositionCallback(@(pos) fitintNewPosition_callback(pos,1));
         intpoint(2).addNewPositionCallback(@(pos) fitintNewPosition_callback(pos,2));
-        uiwait(gcf);
+        waitfor(handles.hfitint,'Tag','continue');
         try
             handles.fitInt = round([ intpoint(1).getPosition(); intpoint(2).getPosition() ]);
         catch
             warn('interrupt',...
                 'Original interval was restored (or set to default in case of an empty original interval)');
-            if isempty(handles.fitInt); handles.fitInt = round([handles.hgraph.XLim(1),0;handles.hgraph.XLim(2),0]); % set default handles.fitInt
-            else handles.fitInt = oldInt; end;
+            handles.fitInt = oldInt;
         end
         intpoint(1).delete;                 % remove points
         intpoint(2).delete;
@@ -1245,31 +1256,34 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hfitint.String = strcat('<HTML><center>Change<br>[',num2str(round(handles.fitInt(1,1))),',',...
                                 num2str(round(handles.fitInt(2,1))),']</HTML>');
         handles.hfitint.Callback = @fitint_callback;        
-        handles.hgraph.ButtonDownFcn = {@getcursor_callback};       % return the the general buttonup callback
-        
+        handles.hgraph.ButtonDownFcn = {@getcursor_callback};       % return the the general button callback
+        set([handles.hfitline,handles.hfitexp,handles.hfitplateau],'Enable','on'); % restore fitting
+        handles.selecting = false;
+
     end
 
     % callback called when impoint gets new position
     function fitintNewPosition_callback(coor,var)
+        nvar = mod(var,2)+1;
         persistent hline;
         if isempty(hline);
-            hline.ph = [];
-            hline.cx = [];
-            hline(2).ph = [];
-            hline(2).cx = [];
+            hline = struct('ph',[],'cx',[]);
+            hline(2) = hline(1);
         end;
-        if(var==0)  % remove both
-            if ~isempty(hline(1).ph); hline(1).ph.delete; end;
+        if(var==0)  % remove both; delete the ph graphs
+            if ~isempty(hline(1).ph); hline(1).ph.delete; end;  % delete graphs
             if ~isempty(hline(2).ph); hline(2).ph.delete; end;
-            if ~isempty(hline(1).cx); hline(1).cx = []; end;
+            if ~isempty(hline(1).cx); hline(1).cx = []; end;    % remove coordinates
             if ~isempty(hline(2).cx); hline(2).cx = []; end;
             return;
         end
-        if ~isempty(hline(var).ph); hline(var).ph.delete; end;
+        if ~isempty(hline(var).ph); hline(var).ph.delete; end;  % delete old line
         yl = handles.hgraph.YLim;
         hline(var).ph = plot(handles.hgraph, [coor(1), coor(1)], handles.hgraph.YLim, 'r', 'HitTest','off');
+        hline(var).ph.Tag = 'intbound';
         ylim(handles.hgraph,yl);
         hline(var).cx = coor(1);
+        if isempty(hline(nvar).cx); hline(nvar).cx = handles.fitInt(nvar,1); end;
         handles.hfitint.String = strcat('<HTML><center><font color="red">Accept<br>[',num2str(round(hline(1).cx)),',',...
                                 num2str(round(hline(2).cx)),']</HTML>');
     end
@@ -2026,7 +2040,26 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         else handles.selecting = true; 
         end;
         
-        if handles.verbose;
+        microns = 5;
+        
+        if strcmp(type,'scale');
+            micronstr = inputdlg(strjoin({'This function allows You to calibrate pixel-to-micron ratio',...
+                'directly on the video image. You can draw a line across an object of known dimensions',...
+                '(e.g. scalebar, bead, etc.). Please note that this information is directly available',...
+                'from Your microscopy setup as a precise number; measuring it this way will yield poorer',...
+                'precision. If You wishto proceed, input the length of the line in microns:'}),...
+                'Video scale calibration',1,{num2str(microns)});
+            if isempty(micronstr); 
+                handles.selecting = false;
+                return;
+            end
+            microns = str2double(micronstr);
+            if isnan(microns) || microns <= 0
+                warn('The input must be a positive number of type double.');
+                handles.selecting = false;
+                return;
+            end                
+        elseif handles.verbose;
             msgOptions.Interpreter = 'Latex';
             msgOptions.WindowStyle  = 'modal';
             msgbox(strjoin({'Select the {\bfseries diameter} of the', type,...
@@ -2045,18 +2078,25 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             if strcmp(type,'pipette')
                 handles.PIPradius = 0.5*length_*handles.P2M;
                 handles.hPIPrad.String = num2str(round(handles.PIPradius,2));
-            else
+            elseif strcmp(type,'contact')
                 handles.CAradius = 0.5*length_*handles.P2M;
                 handles.hCArad.String = num2str(round(handles.CAradius,2));
+            elseif strcmp(type,'scale')
+                handles.P2M = microns/length_;
+                handles.hP2M.String = num2str(round(handles.P2M,2));
             end
         catch
             warn('interrupt',...
-                strjoin({'The',type,'radius detection failed, no changes were made.'}));
+                strjoin({'The',type,'length detection failed, no changes were made.'}));
         end
         source.Callback = {@measureLength_callback,type};   % reset callback
-        Type = type;
-        Type(1) = upper(type(1));
-        str = strcat('<HTML><center>',Type,'<br>radius:</HTML>');                     % reset string
+        if strcmp(type,'scale'); 
+            str='<HTML><center>Pixel to<br>micron:</HTML>'; 
+        else
+            Type = type;
+            Type(1) = upper(type(1));
+            str = strcat('<HTML><center>',Type,'<br>radius:</HTML>');   % reset string
+        end;
         source.String = str;
         handles.selecting = false;
     end

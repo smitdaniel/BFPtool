@@ -290,9 +290,17 @@ end
 
 function [] = cleanBreak(user)
     htrackbar.UserData.killTrack = true;            % kill tracking
+    centres(frames:end,:)     = [];                 % crop zeros...
+    radii(frames:end,:)       = [];
+    metrics(frames:end,:)     = [];
+    badFrames(frames:end,:)   = [];
     vidObj.readFrame(range(1));                     % reset the first frame;
     htrackbar.UserData.wereTracked = wereTracked;   % cancelled tracking, reset the counter    
-    if ~user; htrackbar.delete; end;
+    if ~user; 
+        %htrackbar.delete; 
+        htrackbar.UserData.failure = true;          % report tracking failed
+        htrackbar.UserData.wereTracked = wereTracked + framesToPass;    % report the interval as parsed
+    end;
 end
   
 end

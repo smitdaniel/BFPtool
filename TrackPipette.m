@@ -24,7 +24,7 @@
 
 function [ position, scores, badFrames ] = TrackPipette( vidObj, pipette, varargin )
 
-wbThresh = 100;
+wbThresh = 100;     % minimal # of frames to initialize progress bar
 
 % parse the input; in case initial coordinate and range are not provided,
 % continue by taking the whole range and search the whole field.
@@ -423,9 +423,16 @@ end;
     % facilitate orderly exit, if detection goes wrong
     function [] = cleanBreak(user)
         htrackbar.UserData.killTrack = true;           % stop tracking 
+        position(frames:end,:)  = [];                    % crop zeros...
+        scores(frames:end,:)    = [];
+        badFrames(frames:end,:) = [];
         vidObj.readFrame(range(1));                    % reset the first frame;
         htrackbar.UserData.wereTracked = wereTracked;  % cancelled tracking, reset the counter
-        if ~user; htrackbar.delete; end;
+        if ~user; 
+            %htrackbar.delete; 
+            htrackbar.UserData.failure = true;          % report tracking failed
+            htrackbar.UserData.wereTracked = wereTracked + framesToPass;    % report the interval as parsed
+        end;
     end
 
    

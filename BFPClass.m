@@ -75,7 +75,6 @@ classdef BFPClass < handle
             else
                 intlist = varargin{3};
             
-                obj.tracked = false;                % no tracking done when object is created
                 obj.trackedFrames = 0;
                 obj.toBeTracked = 0;
                 obj.name = varargin{1};             % set calc obj name
@@ -84,6 +83,7 @@ classdef BFPClass < handle
                 obj.minFrame = obj.vidObj.Frames;   % number of frames in the video
                 fields = fieldnames(intlist(1));
                 inters = numel(intlist);
+                obj.tracked(1:inters) = false;      % no tracking done when object is created
                 for int=1:inters                    % copy the list of intervals in the video to analyze
                     for nam=1:numel(fields)
                        obj.intervallist(int).(fields{nam}) = intlist(int).(fields{nam});
@@ -132,20 +132,27 @@ classdef BFPClass < handle
                     {@canceltb_callback},'Units','characters','OuterPosition',[110,40,52,14],...
                     'Resize','on','Visible','on');  % create waitbar figure and pass it on tracking methods
             htrackbar.UserData.killTrack = false;   % set flag to carry on
+            htrackbar.UserData.failure = false;     % set flag tracking failed (and not user-cancelled)
             htrackbar.UserData.intmsg = 'Tracking is about to start';   % waitbar initial message
             htrackbar.UserData.toBeTracked = 2*obj.toBeTracked;   % total number of frames to be tracked x 2 (pipette+bead)
             htrackbar.UserData.wereTracked = 0;     % store number of tracked frames
-            %gdata = guidata(htrackbar,htrackbar.
             cla(hplot,'reset');
             for int = 1:numel(obj.intervallist)
-                if htrackbar.UserData.killTrack; break; end;   % break the tracking if cancelled
+                
+                if htrackbar.UserData.killTrack; break; end;   % break the tracking if user-cancelled
+                
                 htrackbar.UserData.intmsg = strjoin({'Tracking interval',num2str(int),'of',num2str(numel(obj.intervallist))});
                 waitbar(0,htrackbar,htrackbar.UserData.intmsg);
+                
                 [obj.pipPositions(int).coor, obj.pipPositions(int).metric, obj.pipPositions(int).bads] = ...
                                             TrackPipette( obj.vidObj, obj.intervallist(int).pattern,...
                                             obj.intervallist(int).patcoor,obj.intervallist(int).frames,...
                                             'robustness',obj.correlation, 'quality', obj.contrast,...
                                             'buffer', obj.pipbuffer, 'waitbar', htrackbar);
+                if htrackbar.UserData.failure; 
+                    failcontinue(int); 
+                    continue;
+                end;
                 [obj.beadPositions(int).coor,obj.beadPositions(int).rad,obj.beadPositions(int).metric,...
                                             obj.beadPositions(int).bads]  = ...
                                             TrackBead( obj.vidObj, obj.intervallist(int).contrast,...
@@ -153,6 +160,10 @@ classdef BFPClass < handle
                                             'radius', obj.radius, 'buffer', obj.buffer, 'sensitivity', obj.sensitivity,...
                                             'edge', obj.edge, 'robustness', obj.metric, 'quality', obj.contrast,...
                                             'waitbar', htrackbar);
+                if htrackbar.UserData.failure; 
+                    failcontinue(int); 
+                    continue;
+                end;
                 
                 % shift the detected coordinate (upper left corner) to the
                 % position of the anchor; change units from px to microns
@@ -166,15 +177,31 @@ classdef BFPClass < handle
                 % modify number of tracked frames
                 obj.trackedFrames = obj.trackedFrames + ...
                                    (obj.intervallist(int).frames(2)-obj.intervallist(int).frames(1)+1);
+                if ~htrackbar.UserData.killTrack               
+                    obj.tracked(int) = true;    % set 'tracked' flag
+                else
+                    obj.tracked(int) = false;   % set 'not-tracked' flag if user calcelled 
+                end;
             end
             delete(htrackbar);
-            obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');          % plot the tracking data
-            obj.tracked = true;             % set 'tracked' flag
-            obj.generateReport();
             
-                    % callback to kill tracking by pressing cancel on wb
+            if any(obj.tracked);
+                obj.generateReport(); 
+                obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');          % plot the tracking data
+            end;
+            
+            % callback to kill tracking by pressing cancel on wb
             function canceltb_callback(~,~)
                 htrackbar.UserData.killTrack = true;
+            end
+            
+            % reset flags and do updates after failed interval
+            function failcontinue(inum)
+                obj.tracked(inum) = false;
+                htrackbar.UserData.KillTrack = false;   % restore not-user-cancelled
+                htrackbar.UserData.failure = false;     % remove failflag
+                obj.trackedFrames = obj.trackadFrames + ...
+                    (obj.intervallist(inum).frames(2)-obj.intervallist(inum).frames(1)+1);
             end
             
         end
@@ -231,14 +258,18 @@ classdef BFPClass < handle
             set(hplot,'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
             
             for int=1:numel(obj.intervallist)
+                if ~obj.tracked(int); continue; end;    % skip non-tracked intervals
                 hold(hplot,'on');
                 if obj.intervallist(int).frames(1) > lInd || obj.intervallist(int).frames(2) < fInd; continue; end;
                 
                 ffrm = max(fInd,obj.intervallist(int).frames(1));
-                lfrm  = min(lInd,obj.intervallist(int).frames(2));
+                lfrm  = min(lInd,obj.intervallist(int).frames(2));      % # of requested last frame
                 
                 start = ffrm - obj.intervallist(int).frames(1) + 1;
-                stop  = lfrm - obj.intervallist(int).frames(1) + 1;
+                stop_ = lfrm - obj.intervallist(int).frames(1) + 1;     % # of requested frames
+                stop  = min(stop_, start-1+size(obj.pipPositions(int).coor,1) );% really processed frames, pipette
+                lfrmP = min(lfrm, ffrm-1+size(obj.pipPositions(int).coor,1) );  % bead last frame #
+                lfrmB = min(lfrm, ffrm-1+size(obj.beadPositions(int).coor,1) ); % pipette last frame #
                 
                 if strcmp(style,'F')
                     plot( hplot, ffrm:lfrm, obj.force(int).values(start:stop),'g','HitTest','off' );
@@ -251,24 +282,26 @@ classdef BFPClass < handle
                     if pip && numel(obj.pipPositions) ~= 0;
                         if strcmp(style,'3D')
                             plot3(hplot,obj.pipPositions(int).coor(start:stop,2),...
-                            obj.pipPositions(int).coor(start:stop,1),ffrm:lfrm,'b','HitTest','off');
+                            obj.pipPositions(int).coor(start:stop,1),ffrm:lfrmP,'b','HitTest','off');
                         elseif strcmp(style,'2D')
                             plot(hplot,obj.pipPositions(int).coor(start:stop,2),...
                             obj.pipPositions(int).coor(start:stop,1),'b','HitTest','off');
                         elseif strcmp(style, 'M')
-                            plot( hplot, ffrm:lfrm, obj.pipPositions(int).metric(start:stop), 'b', 'HitTest','off');
+                            plot( hplot, ffrm:lfrmP, obj.pipPositions(int).metric(start:stop), 'b', 'HitTest','off');
                         end
                     end
 
+                    stop = min(stop_, start-1+size(obj.beadPositions(int).coor,1)); % really processed frames, bead
+                    
                     if bead && numel(obj.beadPositions) ~= 0;
                         if strcmp(style,'3D')
                             plot3(hplot,obj.beadPositions(int).coor(start:stop,2),...
-                            obj.beadPositions(int).coor(start:stop,1),ffrm:lfrm,'r','HitTest','off');
+                            obj.beadPositions(int).coor(start:stop,1),ffrm:lfrmB,'r','HitTest','off');
                         elseif strcmp(style,'2D')
                             plot(hplot,obj.beadPositions(int).coor(start:stop,2),...
                             obj.beadPositions(int).coor(start:stop,1),'r','HitTest','off');
                         elseif strcmp(style, 'M')
-                            plot( hplot, ffrm:lfrm, obj.beadPositions(int).metric(start:stop), 'r', 'HitTest','off');
+                            plot( hplot, ffrm:lfrmB, obj.beadPositions(int).metric(start:stop), 'r', 'HitTest','off');
                         end
                     end
                     % plot appropriate legend
@@ -351,6 +384,7 @@ classdef BFPClass < handle
             
             % parse all analyzed frames in intervals
             for int=1:numel(obj.intervallist)
+                if ~obj.tracked(int); continue; end;    % skip non-tracked
                 count = 1;    
                 for frm=obj.intervallist(int).frames(1):Sampling:obj.intervallist(int).frames(2)
                     frame = obj.vidObj.readFrame(frm);      % read new frame
@@ -381,7 +415,7 @@ classdef BFPClass < handle
             
             overLimit = false;
             
-            if ( ~obj.tracked )
+            if ( ~any(obj.tracked) )
                 warndlg('No tracking data. Running tracking methods','Tracking data not available','replace');
                 obj.Track(hplot);
             end
@@ -470,6 +504,7 @@ classdef BFPClass < handle
             
             givenan = true;     % suppose frame does not belong to any interval, return NaN is such case
             for int = 1:numel(obj.intervallist)
+                if ~obj.tracked(int); continue; end;    % skip non-tracked
                 if ((frm >= obj.intervallist(int).frames(1)) && (frm <= obj.intervallist(int).frames(2)))
                     frcint = int;   % find the interval of the frame
                     givenan = false;
@@ -592,6 +627,7 @@ classdef BFPClass < handle
             title( hrepax, 'Detection metrics', 'FontUnits','normalized','FontSize',BFPClass.reportfontsize);
             
             for int=1:numel(obj.intervallist)
+                if ~obj.tracked(int); continue; end;    % skip non-tracked
                 ffrm = obj.intervallist(int).frames(1);
                 %lfrm = obj.intervallist(int).frames(2);
                 ffrm = ffrm-1;
