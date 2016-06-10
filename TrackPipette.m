@@ -122,6 +122,7 @@ if tbSwitch     % do use WB
         htrackbar = waitbar(0,'Tracking bead','Name','Standalone pipette tracking');
         htrackbar.UserData.intmsg = 'No ongoing tracking provided';
         htrackbar.UserData.killTrack = false;
+        htrackbar.UserData.toBeTracked = framesToPass;
     end
 end
 
@@ -149,11 +150,14 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));   % area to search for the pipette
     
     % check if the presumed pattern is not out of field => failed tracking
-    if (any(size(subframe) < size(pipette) )) 
+    if (any(size(subframe) < size(pipette) ) || thisFrame==50) 
         cleanBreak(false);
-        error(strjoin({'At frame', num2str(thisFrame), 'position of the detected pattern upper left anchor is',...
+        warndlg(strjoin({'At frame', num2str(thisFrame), 'position of the detected pattern upper left anchor is',...
             strcat('[',num2str(round(index(2))),',',num2str(round(index(1))),']'),'too near to the edge of the field.',...
-            'The pipette left the field or the tracking must have failed in a few preceding frames.'}));  % throw error (nobody catches)
+            'The pipette left the field or the tracking must have failed in a few preceding frames.',...
+            'The interval will be excluded from the tracking.'}),...
+            'Pipette detection failure', 'replace');
+        return;
     end
     
     score = normxcorr2( pipette, subframe );    % compute normalized cross correlation, 2D; note returns with padding
@@ -163,8 +167,8 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     % check the quality of contrast over 'review' window to determine further refinements
     contrastTest = mean(contrast(max(thisFrame-review,range(1)):thisFrame));   
     
-    [index(1),index(2)] = (find( score==max(score(:)),1));    % find the index of the maximum [row,column]
-    maxscore = score(index(1),index(2));                      % get non-rounded maximal score (metric)
+    [maxscore, oneindex] = max(score(:));
+    [index(1),index(2)] = ind2sub(size(score),oneindex);
     
     % treat unsucessful searches, 5 failure grace period allowed; old value
     % is coppied for the next round
@@ -196,7 +200,10 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
                 continue;
             else
                 cleanBreak(false);
-                error(strjoin({num2str(buffer), 'consecutive failures, abort at frame', num2str(thisFrame)}));  % throw error (nobody catches)
+                warndlg(strjoin({num2str(buffer), 'consecutive frame failures, detection failed at frame',...
+                    [num2str(thisFrame),'.'],'The interval will be excluded from the results.'}),...
+                    'Pipette detection failure','replace');
+                return;
             end;
         end
     end;
@@ -246,7 +253,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
             if metricTest <= robust(2);     % metric is still too poor
                 dilatedPatternSearch(1);
                 if metricTest <= robust(1)  % the xcorr is failing;
-                    badFrames(frames) = true;
+                    badFrames(frames,:) = true;
                     if strcmp(choice,'report') && frames-warnSev(1) > 10;
                     choice = questdlg(strjoin({'The frame',num2str(thisFrame),'in the interval missed the quality requirements.',...
                         'The metric reads',num2str(round(metricTest,3)),'below threshold',num2str(round(robust(1),3)),...
@@ -276,7 +283,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     if (~single)         
         dist = norm( index - lastPosition(true) );
         if dist > 5;
-            badFrames(frames) = true;
+            badFrames(frames,:) = true;
             if frames - warnSev(1) > 10;
                 warning(strjoin({'At frame %d a suspiciously large displacement of pipette occured, %.1f pixels.',...
                 'Anything above %d pixels is considered suspicious. Frame was logged as a bad frame.'}),...
@@ -294,7 +301,7 @@ end;    % end for the while cycle of the interval
 
 vidObj.readFrame(range(1));
 if(tbSwitch)
-    htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
+    htrackbar.UserData.wereTracked = wereTracked + framesToPass;  % add frames that were passed
 end;
 
     % ======================= support nested functions =================
@@ -421,17 +428,17 @@ end;
     end
 
     % facilitate orderly exit, if detection goes wrong
-    function [] = cleanBreak(user)
-        htrackbar.UserData.killTrack = true;           % stop tracking 
+    function [] = cleanBreak(user)        
         position(frames:end,:)  = [];                    % crop zeros...
         scores(frames:end,:)    = [];
         badFrames(frames:end,:) = [];
         vidObj.readFrame(range(1));                    % reset the first frame;
-        htrackbar.UserData.wereTracked = wereTracked;  % cancelled tracking, reset the counter
         if ~user; 
-            %htrackbar.delete; 
             htrackbar.UserData.failure = true;          % report tracking failed
             htrackbar.UserData.wereTracked = wereTracked + framesToPass;    % report the interval as parsed
+        else
+            htrackbar.UserData.wereTracked = wereTracked;  % cancelled tracking, reset the counter 
+            htrackbar.UserData.killTrack = true;           % stop tracking 
         end;
     end
 

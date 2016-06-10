@@ -139,7 +139,10 @@ classdef BFPClass < handle
             cla(hplot,'reset');
             for int = 1:numel(obj.intervallist)
                 
-                if htrackbar.UserData.killTrack; break; end;   % break the tracking if user-cancelled
+                if htrackbar.UserData.killTrack; 
+                    obj.tracked(int:end) = false;   % set all following intervals to non-tracked
+                    break;                          % break the tracking if user-cancelled
+                end;   
                 
                 htrackbar.UserData.intmsg = strjoin({'Tracking interval',num2str(int),'of',num2str(numel(obj.intervallist))});
                 waitbar(0,htrackbar,htrackbar.UserData.intmsg);
@@ -150,7 +153,7 @@ classdef BFPClass < handle
                                             'robustness',obj.correlation, 'quality', obj.contrast,...
                                             'buffer', obj.pipbuffer, 'waitbar', htrackbar);
                 if htrackbar.UserData.failure; 
-                    failcontinue(int); 
+                    failcontinue(int,true); 
                     continue;
                 end;
                 [obj.beadPositions(int).coor,obj.beadPositions(int).rad,obj.beadPositions(int).metric,...
@@ -161,7 +164,7 @@ classdef BFPClass < handle
                                             'edge', obj.edge, 'robustness', obj.metric, 'quality', obj.contrast,...
                                             'waitbar', htrackbar);
                 if htrackbar.UserData.failure; 
-                    failcontinue(int); 
+                    failcontinue(int,false); 
                     continue;
                 end;
                 
@@ -177,12 +180,15 @@ classdef BFPClass < handle
                 % modify number of tracked frames
                 obj.trackedFrames = obj.trackedFrames + ...
                                    (obj.intervallist(int).frames(2)-obj.intervallist(int).frames(1)+1);
+                
+                % if killed by user (but not failed), set to tracked               
                 if ~htrackbar.UserData.killTrack               
                     obj.tracked(int) = true;    % set 'tracked' flag
                 else
                     obj.tracked(int) = false;   % set 'not-tracked' flag if user calcelled 
                 end;
             end
+            
             delete(htrackbar);
             
             if any(obj.tracked);
@@ -196,12 +202,21 @@ classdef BFPClass < handle
             end
             
             % reset flags and do updates after failed interval
-            function failcontinue(inum)
+            function failcontinue(inum,pipette)
                 obj.tracked(inum) = false;
-                htrackbar.UserData.KillTrack = false;   % restore not-user-cancelled
+                htrackbar.UserData.killTrack = false;   % restore not-user-cancelled
                 htrackbar.UserData.failure = false;     % remove failflag
-                obj.trackedFrames = obj.trackadFrames + ...
+                obj.trackedFrames = obj.trackedFrames + ...
                     (obj.intervallist(inum).frames(2)-obj.intervallist(inum).frames(1)+1);
+                if pipette % no bead results, if pipette tracking fails
+                    htrackbar.UserData.wereTracked = htrackbar.UserData.wereTracked +...
+                        (obj.intervallist(inum).frames(2)-obj.intervallist(inum).frames(1)+1);   % add frames skipped on bead
+                    obj.beadPositions(inum).coor   = [];
+                    obj.beadPositions(inum).rad    = [];
+                    obj.beadPositions(inum).metric = [];
+                    obj.beadPositions(inum).bads   = [];
+                    
+                end                
             end
             
         end
@@ -424,30 +439,54 @@ classdef BFPClass < handle
             % search reference frames and calculate reference distance for
             % each interval; this will be passed to force calc. procedure
             for int=1:numel(obj.intervallist)
+                if ~obj.tracked(int); continue; end;    % skip non-tracked intervals
                 ind = 0;
                 for oint=1:numel(obj.intervallist)
+                    if ~obj.tracked(oint); continue; end;% skip non-tracked intervals
                     % test if reference is in this interval
                     if ( obj.intervallist(int).reference >= obj.intervallist(oint).frames(1)  &&...
                          obj.intervallist(int).reference <= obj.intervallist(oint).frames(2) );
                         ind = oint;  % save interval number
-                        coorind = obj.intervallist(int).reference - obj.intervallist(ind).frames(1) + 1;
+                        coorind = obj.intervallist(int).reference - obj.intervallist(ind).frames(1) + 1;                      
                         refdist(int) = norm( obj.pipPositions(ind).coor(coorind,:)...
                                             - obj.beadPositions(ind).coor(coorind,:) );
+                        break;  % break internal cycle once interval found
                     end
                 end
                 if (ind==0);
-                    warndlg({strcat('Unstrained distance for interval ',num2str(int), ' refers to the frame ',...
-                        num2str(obj.intervallist(int).reference), ' which is not member of any analyzed interval');...
-                        'Double check the settings, update the calculation and try again';...
-                        'Calculation will be aborted'},'Incorrect reference frame', 'replace');
-                    return;
+                    for rint=1:numel(obj.intervallist)
+                        if obj.tracked(rint); continue; end; % go through intervals removed due to failure
+                        if ( obj.intervallist(int).reference >= obj.intervallist(rint).frames(1)  &&...
+                         obj.intervallist(int).reference <= obj.intervallist(rint).frames(2) );
+                            ind=rint;
+                            break;  % break inner loop once found
+                        end
+                    end
+                    if (ind~=0) % reference frame belongs to a failed interval
+                        hwarn = warndlg(strjoin({'Unstrained distance for interval',num2str(int), 'refers to the frame',...
+                            num2str(obj.intervallist(int).reference), 'which is a member of interval',[num2str(ind),','],...
+                            'but this interval was excluded, because a falure occured during its processing.',...
+                            'The interval',num2str(int),'was thus excluded from further analysis. If You wish to have it included,'...
+                            'You may particularly narrow down the interval around the frame of reference distance, to',...
+                            'minimize chance of failure in that interval.'}),...
+                            'Failed interval of reference frame', 'replace');
+                    else    % the setting of the reference frame is messed up
+                        hwarn = warndlg(strjoin({'Unstrained distance for interval',num2str(int), 'refers to the frame',...
+                            num2str(obj.intervallist(int).reference), 'which is not member of any analyzed interval.',...
+                            'The interval was excluded from further analysis. If You wish to have it included,'...
+                            'double check the settings, update the calculation and try again.'}),...
+                            'Misplaced reference frame', 'replace');                        
+                    end  
+                    uiwait(hwarn);
+                    obj.tracked(int) = false; 
+                    continue;
                 end
             end
             
             % verify, if number of reference distances matches the number
             % of reference intervals - this error would be very strange
-            if (numel(refdist) ~= numel(obj.intervallist))
-                warndlg({'Number of detected reference distances does not match the number of analyzed intervals';...
+            if (sum(refdist~=0) ~= sum(obj.tracked))
+                warndlg({'Number of detected reference distances does not match the number of approved intervals';...
                     'This is very strange, because previous checks should have averted this.';...
                     'The calculation will be aborted. Try again with careful checking.'},...
                     'Mysterious reference distance inequality','replace');
@@ -459,11 +498,12 @@ classdef BFPClass < handle
             hold(hplot,'on');
             % if all passed, calculate the force
             for int=1:numel(obj.intervallist);
+                if ~obj.tracked(int); continue; end;    % skip non-tracked intervals
                 % verify if the number of parsed frames matches
                 if (size(obj.pipPositions(int).coor,1) ~= size(obj.beadPositions(int).coor,1) ||...
                     size(obj.pipPositions(int).coor,1) ~= ...
                         (obj.intervallist(int).frames(2)-obj.intervallist(int).frames(1)+1) )
-                    warndl({'The number of tracked frames does not match';...
+                    warndlg({'The number of tracked frames does not match';...
                         strcat('Pipette: ', num2str(size(obj.pipPositions(int).coor,1)));...
                         strcat('Bead: ',    num2str(size(obj.beadPositions(int).coor,1)));...
                         strcat('Interval: ',num2str(obj.intervallist(int).frames(2)-obj.intervallist(int).frames(1)+1))},...
@@ -496,7 +536,13 @@ classdef BFPClass < handle
 %                 plot( hplot, obj.intervallist(int).frames(1):obj.intervallist(int).frames(2),...
 %                       obj.force(int).values,'g','HitTest','off' );
             end
-            obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,false,false,'Style','F');
+            if any(refdist~=0);
+                obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,false,false,'Style','F');
+            else
+                warndlg(strjoin({'No data interval could be matched with an appropriate reference'...
+                    'distance frame. Tracking of the intervals either failed, or the settings were',...
+                    'put incorrectly.'}),'No viable force calculation','replace');
+            end
         end
         
         % return force value by frame;  %TODO: ADD INPUT PARSER
@@ -747,13 +793,13 @@ end
 function [badInts] = fillHoles(badFrames)
     inds = find(badFrames);
     ne   = numel(badFrames);
-    for i=inds % dilate all trues -3:+3
+    for i=inds' % dilate all trues -3:+3
         badFrames(max(i-3,1):min(i+3,ne)) = true;
     end;
     badInts = findIntervals(badFrames);
 
     for int=size(badInts,1):-1:1    % prune lone standing badFrames
-        if badInts(int,2)-badInts(int,1) <= 7; badInts(int,:) = [];
+        if badInts(int,2)-badInts(int,1) <= 8; badInts(int,:) = [];
         else % erode dilated frames
             badInts(int,1) = max(badInts(int,1)+3,1);
             badInts(int,2) = min(badInts(int,2)-3,ne);

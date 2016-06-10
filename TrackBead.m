@@ -15,6 +15,7 @@
 %   imagequality: how bad can image be
 %   review  : number of frames averaged to get info about metric and contr.
 %   retries : number of retries for one frame (w/ relaxed conditions)
+%   retry   : call on this function is a retry from another function run
 %   waitbar : handle to figure of tracking progress bar started externally
 %   OUT:
 %   centres : centres of the detected bead, one centre per frame
@@ -47,6 +48,7 @@ defaultImageQuality = 0.96;         % level of contrast considered too poor
 defaultReview       = 5;            % number of passed frames to calculate metric and contrast states
 defaultRetries      = 5;            % number of retries (conditions are relaxed during each retry)
 defaultWaitbar      = [];
+defaultRetry        = false;
 
 addRequired(inp,'vidObj');
 addRequired(inp,'contrast');
@@ -62,6 +64,7 @@ addParameter(inp,'quality',defaultImageQuality,@isnumeric);
 addParameter(inp,'review',defaultReview,@isnumeric);
 addParameter(inp,'retries',defaultRetries,@isnumeric);
 addParameter(inp,'waitbar',defaultWaitbar,@isgraphics);
+addParameter(inp,'retry', defaultRetry,@islogical)
 
 parse(inp, vidObj, contrast, inicoor, varargin{:});
 
@@ -72,6 +75,7 @@ range    = inp.Results.range;
 framesToPass = range(2)-range(1)+1; % number of frames to parse
 radius   = inp.Results.radius;
 radius(1)= max(radius(1),1);    % make sure lower bound is non-negative
+radius(2)= max(radius(1),radius(2));    % make sure r(2) >= r(1)
 buffer   = inp.Results.buffer;
 sensitivity = inp.Results.sensitivity;
 edge     = inp.Results.edge;
@@ -80,6 +84,7 @@ robust   = inp.Results.robustness;
 quality  = inp.Results.quality;
 review   = inp.Results.review;
 retries  = inp.Results.retries;
+isRetry  = inp.Results.retry;
 
 % if no WB was passed in and the interval is short, do not generate WB
 if isempty(inp.Results.waitbar) && framesToPass < wbThresh;
@@ -88,6 +93,9 @@ else
     tbSwitch = true;
     htrackbar = inp.Results.waitbar;
 end;
+
+% save radius hard limits (global)
+haradius = radius;
 
 % =======================================================================
 
@@ -117,10 +125,11 @@ if tbSwitch     % do use WB
         htrackbar.UserData.beadmsg = strjoin({'Tracking bead'});
         wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
         waitbar(0,htrackbar,wbmsg);
-    else        
+    else
         htrackbar = waitbar(0,'Tracking bead','Name','Standalone bead tracking');
         htrackbar.UserData.intmsg = 'No ongoing tracking provided';
         htrackbar.UserData.killTrack = false;
+        htrackbar.UserData.toBeTracked = framesToPass;
         wereTracked = 0;
     end
 end
@@ -148,10 +157,13 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     
     % ====  THE TRACKING PART   ====
     % search beads using both methods
-    if (box(2,1)-box(1,1) < radius(1)) || (box(2,2)-(box(1,2)) < radius(1)) % search subframe too small
+    if (box(2,1)-box(1,1) < radius(1)) || (box(2,2)-(box(1,2)) < radius(1) ) % search subframe too small
         cleanBreak(false);
-        error(strjoin({'A tracking subframe became too small at the frame', num2str(range(1) + frames - 1),...
-            'The bead strayed too close to the edge or the traking failed in the last few frames.'}));  % throw error and quit
+        warndlg(strjoin({'A tracking subframe became too small at the frame', num2str(range(1) + frames - 1),...
+            'The bead strayed too close to the edge or the traking failed in the last few frames.',...
+            'The interval will be excluded from the tracking.'}),...
+            'Bead detection failure', 'replace');
+        return;
     end
         
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));       % area to search for the circle
@@ -173,27 +185,30 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
         if(tmpMoved < distance(2) && rad(i) >= radius(1) && rad(i) <= radius(2) ); distance = [i,tmpMoved]; end;   % choose the closest bead
     end;
 
-    if(distance(1) == 0 && failcounter < buffer)     % failed to detect anything - 'buffer' consecutive failed detections allowed
+    if( distance(1) == 0 && failcounter < buffer )     % failed to detect anything - 'buffer' consecutive failed detections allowed
         found = false;
         calls = 1;
         while( ~found && calls <= retries );   % try progressively less restrictive search
-            found = retry(calls); 
+            found = retry(calls);
             calls = calls + 1;
         end;
-        if ~found;                      % if still nothing is found
+        if ~found;                              % if still nothing is found 
             failcounter = failcounter + 1;
             badFrames(frames,:) = true;         % log a bad frame
             centre = centres(max(frames-1,1),:);% [x,y]
             rad = radii(max(frames-1,1),:);     % no modification
             metric = 0;                         % failure metric value is 0
-            if (calls==retries) % if detection fails for all retries
+            if (calls==retries+1 && ~isRetry)   % if detection fails for all retries, and is not one of the retries
                 warning(strjoin({'Bead detection failure at frame',num2str(range(1) + frames - 1),char(10),...
                 'Consecutive failures: ', num2str(failcounter),'/',num2str(buffer)}));
             end;
         end
     elseif(distance(1) == 0 && failcounter >= buffer)   % 'buffer' failures in a row, abort
         cleanBreak(false);
-        error(strjoin({num2str(buffer),' consecutive failures, abort at frame', num2str(range(1) + frames - 1)}));  % throw error and quit
+        warndlg(strjoin({num2str(buffer), 'consecutive frame failures, detection failed at frame',...
+                    [num2str(thisFrame),'.'],'The interval will be excluded from the results.'}),...
+                    'Bead detection failure','replace');    % inform about detection fail before return
+        return;
     else                                % detection successful, save new centre
         failcounter = 0;                % reset failcounter after a successful detection
         centre = centre(distance(1),:); % keep only the closest circle, still in [x,y]
@@ -242,7 +257,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     metrics(frames,:) = metric;
     if metric < robust; badFrames(frames,:) = true; end;
 
-    radius = [max(floor(rad-4),radius(1)), min(ceil(rad+4),radius(2))];     % modify the radius interval (not over 18)
+    radius = [max(floor(rad-4),haradius(1)), min(ceil(rad+4),haradius(2))];    % modify the radius interval (not over 18)
     box = [floor(centre - side); ceil(centre + side)];                      % modify the bounding box for the next search
     box(1,1) = max(box(1,1),1);         % do not let the box outside ...
     box(1,2) = max(box(1,2),1);         % ... the frame field
@@ -257,18 +272,25 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
 end
 vidObj.readFrame(range(1)); % return iterator back to the initial frame
 if tbSwitch
-    htrackbar.UserData.wereTracked = wereTracked + frames;  % add frames that were passed
+    htrackbar.UserData.wereTracked = wereTracked + framesToPass;  % add frames that were passed
 end;
     
 % retries the search with relaxed parameters
 function [got] = retry(C)
     
+    if C < 1;
+        warning(strjoin({'Retry function of bead tracking method was passed a negative argument,',...
+            'which is illegal. Frame:',[num2str(range(1)-1+frames),'.'],'No retry will be run.'}));
+        return;
+    end;
+    
     LP = lastPosition();
     thisFrame = range(1) - 1 + frames;
     [c,r,m] = TrackBead(vidObj,contrast,LP,[thisFrame,thisFrame],...
-        'radius', radius + [-C,+C], 'sensitivity', min(sensitivity+0.1*C,1), 'edge', max(edge-0.1*C,0),'retries',0);
+        'radius', radius + [-C,+C], 'sensitivity', min(sensitivity+0.1*C,1),...
+        'edge', max(edge-0.1*C,0),'retries',0, 'retry', true);
     
-    if m > 0            % if bead is found
+    if m > 0             % if bead is found
         centre = c;
         rad    = r;
         metric = m;
@@ -288,18 +310,18 @@ function [LP] = lastPosition()
     end
 end
 
-function [] = cleanBreak(user)
-    htrackbar.UserData.killTrack = true;            % kill tracking
+function [] = cleanBreak(user)    
     centres(frames:end,:)     = [];                 % crop zeros...
     radii(frames:end,:)       = [];
     metrics(frames:end,:)     = [];
     badFrames(frames:end,:)   = [];
-    vidObj.readFrame(range(1));                     % reset the first frame;
-    htrackbar.UserData.wereTracked = wereTracked;   % cancelled tracking, reset the counter    
-    if ~user; 
-        %htrackbar.delete; 
+    vidObj.readFrame(range(1));                     % reset the first frame;     
+    if ~user;   % failure, not cancelled by the user
         htrackbar.UserData.failure = true;          % report tracking failed
         htrackbar.UserData.wereTracked = wereTracked + framesToPass;    % report the interval as parsed
+    else 
+        htrackbar.UserData.wereTracked = wereTracked;   % cancelled tracking, reset the counter
+        htrackbar.UserData.killTrack = true;            % kill tracking
     end;
 end
   
