@@ -157,7 +157,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     
     % ====  THE TRACKING PART   ====
     % search beads using both methods
-    if (box(2,1)-box(1,1) < radius(1)) || (box(2,2)-(box(1,2)) < radius(1) ) % search subframe too small
+    if (box(2,1)-box(1,1) < radius(1)) || (box(2,2)-(box(1,2)) < radius(1)) % search subframe too small
         cleanBreak(false);
         warndlg(strjoin({'A tracking subframe became too small at the frame', num2str(range(1) + frames - 1),...
             'The bead strayed too close to the edge or the traking failed in the last few frames.',...

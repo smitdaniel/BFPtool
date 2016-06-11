@@ -36,7 +36,6 @@ function [ backdoorObj ] = BFPGUI( varargin )
     
 % ===================================================================
 
-
 % UI settings
 handles.verbose = true;     % sets UI to provide more (true) or less (false) messages
 handles.selecting = false;  % indicates, if selection is under way and blocks other callbacks of selection
@@ -47,6 +46,14 @@ handles.labelfontsize = 0.04;   % normalized size of the font in (some) labels
 
 % create backdoor object to modify hidden parameters
 backdoorObj = BFPGUIbackdoor(@backdoorFunction);
+
+% turn off LibTIFF warnings
+warning('off','MATLAB:imagesci:tiffmexutils:libtiffWarning');
+
+% constants
+RBC = 2.5;
+PIP = 1;
+CON = 0.75;
 
 % variables related to tracking
 handles.pattern = [];       % pattern to be tracked over the video; an image
@@ -77,9 +84,9 @@ handles.outsampling = 1;    % each n-th frame of original video is taken for out
 
 % experimental parameters
 handles.pressure = 200;     % aspirating pressure of the pipette
-handles.RBCradius = 2.5;    % radius of RBC
-handles.PIPradius = 1;      % inner pipette radius
-handles.CAradius = 1.5;     % radius of contact between streptabead and RBC
+handles.RBCradius = RBC;    % radius of RBC
+handles.PIPradius = PIP;    % inner pipette radius
+handles.CAradius = CON;     % radius of contact between streptabead and RBC
 handles.P2M = 0.1024;       % pixels to microns coefficient
 handles.stiffness = 200;    % RBC stiffness, in pN/micron
 
@@ -471,6 +478,9 @@ handles.hreport      =   uicontrol('Parent', handles.hcalc,'Style','pushbutton',
 handles.hlinearinfo  =   uicontrol('Parent', handles.hcalc,'Style','pushbutton','String','<HTML><center><font size="3" color="black">?</font></HTML>',...
                 'Units','normalized','Position',[0,0.65,0.25,0.05],'Enable','off','Callback',{@lininfo_callback},...
                 'TooltipString','Information on reliability of linear approximation of force');
+handles.hstiffbtn    =   uicontrol('Parent', handles.hcalc,'Style','pushbutton','String','<HTML><center><font size="3" color="black">k</font></HTML>',...
+                'Units','normalized','Position',[0.25,0.65,0.25,0.05],'Enable','off','Callback',{@stiffinfo_callback},...
+                'TooltipString','Click here, if stiffness is not displayed correctly');            
 % contrast type selection button group + radio buttons
 handles.hcontype     =   uibuttongroup('Parent', handles.hcalc, 'Units', 'normalized',...
                 'Position', [0.5,0.25,0.5,0.1],'SelectionChangedFcn', {@contype_callback});
@@ -1407,6 +1417,15 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};
     end    
 
+    % displays information about stiffness in a new window
+    function stiffinfo_callback(~,~)
+        boxoptions.Interpreter = 'latex';
+        boxoptions.WindowStyle = 'modal';
+        hmb=msgbox(strjoin({'$$k=',num2str(round(BFPobj.k)),'\frac{pN}{\mu m}$$',char(10),...
+            '$$\Delta k=\pm',num2str(round(BFPobj.Dk)),'\frac{pN}{\mu m}$$'}),...
+            'Stiffness info', boxoptions);
+    end
+
     % displays information about reliability of the linear approximation of
     % force-extension relation
     function lininfo_callback(~,~)
@@ -1426,7 +1445,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 
     % gets parameters for calculation, calculates (&shows) 'k', gets force
     function runforce_callback(~,~)
-        if handles.verbose; 
+        % if verbose and geometric parameters were not changed, warn
+        if handles.verbose && (handles.RBCradius == RBC && handles.PIPradius == PIP &&...
+                               handles.CAradius == CON)
             choice = questdlg(strjoin({'This action runs force calculation. The force, however,',...
                 'must be calibrated (i.e. stiffness ''k'' calculated) using experiment settings dependent parameters',...
                 'adjustable in ''Experimental parameters'' panel. Initially, it contains only order of magnitude',...
@@ -1439,6 +1460,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.stiffness = BFPobj.k;
         handles.overLimit = BFPobj.getForce(handles.hgraph);
         handles.hlinearinfo.Enable = 'on';
+        handles.hstiffbtn.Enable = 'on';
         handles.toPlot = 4;
         handles.thisPlot = 4;
         handles.hgraphitem.Value = handles.thisPlot;
@@ -1447,7 +1469,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.thisRange = [handles.lowplot,handles.highplot];
         handles.hlowplot.String = num2str(handles.lowplot);
         handles.hhighplot.String = num2str(handles.highplot);
-        plotZeroLine();     % mark line of zero force
+        tmplines = findobj(handles.hgraph,'type','line');
+        if ~isempty(tmplines)
+            plotZeroLine();     % mark line of zero force
+        end
         makeStiffAnot();    % display RBC stiffness info
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};
     end
@@ -2520,7 +2545,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
         handles.fitInt = [handles.lowplot, 0; handles.highplot, 0];  % set global fit interval
         
-        cla(handles.hgraph);                % clear current graph
+        cla(handles.hgraph);                    % clear current graph
+        ax2 = findobj('Tag','deformationaxis'); % delete the right y-axis, which might be...
+        if exist('ax2','var'); ax2.delete; end; % ... drawn by force plotter; tagged
         hold(handles.hgraph,'on');
         set(handles.hgraph, 'FontUnits','normalized','FontSize',handles.labelfontsize);
         hconplot  = plot(handles.hgraph,handles.lowplot:handles.highplot,contrast(handles.lowplot:handles.highplot),'r','HitTest','off');

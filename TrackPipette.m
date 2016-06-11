@@ -150,7 +150,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));   % area to search for the pipette
     
     % check if the presumed pattern is not out of field => failed tracking
-    if (any(size(subframe) < size(pipette) ) || thisFrame==50) 
+    if (any(size(subframe) < size(pipette) )) 
         cleanBreak(false);
         warndlg(strjoin({'At frame', num2str(thisFrame), 'position of the detected pattern upper left anchor is',...
             strcat('[',num2str(round(index(2))),',',num2str(round(index(1))),']'),'too near to the edge of the field.',...

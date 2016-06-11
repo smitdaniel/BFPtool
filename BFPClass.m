@@ -191,6 +191,7 @@ classdef BFPClass < handle
             
             delete(htrackbar);
             
+            % if at least one object was tracked
             if any(obj.tracked);
                 obj.generateReport(); 
                 obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');          % plot the tracking data
@@ -203,11 +204,18 @@ classdef BFPClass < handle
             
             % reset flags and do updates after failed interval
             function failcontinue(inum,pipette)
+                str = ['_time_',datestr(datetime('now'),'HHMM')]; % get current time (to label dumped logs)
+                warning(['The imterim data of failed interval (', num2str(inum), ') will be dumped into',...
+                    ' the base Matlab workspace after the tracking finishes.']);
                 obj.tracked(inum) = false;
                 htrackbar.UserData.killTrack = false;   % restore not-user-cancelled
                 htrackbar.UserData.failure = false;     % remove failflag
                 obj.trackedFrames = obj.trackedFrames + ...
-                    (obj.intervallist(inum).frames(2)-obj.intervallist(inum).frames(1)+1);
+                (obj.intervallist(inum).frames(2)-obj.intervallist(inum).frames(1)+1);  % mark frames as processed
+                
+                % dump current values of pipette into 'base' workspace
+                strpip = ['pipette_int_',num2str(inum),str];
+                assignin('base',strpip,obj.pipPositions(inum));
                 if pipette % no bead results, if pipette tracking fails
                     htrackbar.UserData.wereTracked = htrackbar.UserData.wereTracked +...
                         (obj.intervallist(inum).frames(2)-obj.intervallist(inum).frames(1)+1);   % add frames skipped on bead
@@ -215,7 +223,9 @@ classdef BFPClass < handle
                     obj.beadPositions(inum).rad    = [];
                     obj.beadPositions(inum).metric = [];
                     obj.beadPositions(inum).bads   = [];
-                    
+                else
+                    strbead = ['bead_int_',num2str(inum),str];
+                    assignin('base',strbead,obj.beadPositions(inum));
                 end                
             end
             
@@ -247,6 +257,9 @@ classdef BFPClass < handle
             bead  = inp.Results.bead;
             style = inp.Results.Style;
             % ===========================            
+            
+            persistent ax2;
+            if ~isempty(ax2); ax2.delete; end
             
             if strcmp(style,'2D') || strcmp(style,'3D')
                 if pip && ~bead && numel(obj.pipPositions)==0       % plot only pipette, but no pipette
@@ -288,11 +301,21 @@ classdef BFPClass < handle
                 
                 if strcmp(style,'F')
                     plot( hplot, ffrm:lfrm, obj.force(int).values(start:stop),'g','HitTest','off' );
+                    hp_position = hplot.Position;
+                    ax2 = axes('Position',hp_position,'YAxisLocation','right','Color','none');
+                    set(ax2,'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    ax2.YLim = hplot.YLim/obj.k;
+                    ax2.XLabel = [];
+                    ax2.XTickLabelMode = 'manual';
+                    ax2.XTickLabel = [];
+                    ax2.Tag = 'deformationaxis';
                     lh = legend(hplot,'force');
                     th = title(hplot, 'Force [pN]','Color','green', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     xlabel(hplot, 'time [frames]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     ylabel(hplot, 'Force [pN]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    ylabel(ax2,'Deformation [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     hold on;
+                    
                 else
                     if pip && numel(obj.pipPositions) ~= 0;
                         if strcmp(style,'3D')
@@ -440,41 +463,42 @@ classdef BFPClass < handle
             % each interval; this will be passed to force calc. procedure
             for int=1:numel(obj.intervallist)
                 if ~obj.tracked(int); continue; end;    % skip non-tracked intervals
-                ind = 0;
+                ind = 0;    % index of interval contraining frame of reference distance
                 for oint=1:numel(obj.intervallist)
                     if ~obj.tracked(oint); continue; end;% skip non-tracked intervals
-                    % test if reference is in this interval
+                    % test if reference is in this interval 'oint'
                     if ( obj.intervallist(int).reference >= obj.intervallist(oint).frames(1)  &&...
                          obj.intervallist(int).reference <= obj.intervallist(oint).frames(2) );
                         ind = oint;  % save interval number
-                        coorind = obj.intervallist(int).reference - obj.intervallist(ind).frames(1) + 1;                      
+                        coorind = obj.intervallist(int).reference - obj.intervallist(ind).frames(1) + 1; % frame # in the particular interval
                         refdist(int) = norm( obj.pipPositions(ind).coor(coorind,:)...
-                                            - obj.beadPositions(ind).coor(coorind,:) );
-                        break;  % break internal cycle once interval found
+                                            - obj.beadPositions(ind).coor(coorind,:) ); % reference distance for interval 'int'
+                        break;  % break internal cycle once interval 'ind' is found
                     end
                 end
-                if (ind==0);
+                if (ind==0);    % interval not found
                     for rint=1:numel(obj.intervallist)
-                        if obj.tracked(rint); continue; end; % go through intervals removed due to failure
+                        if obj.tracked(rint); continue; end; % go through intervals removed due to failure; skip tracked ints
                         if ( obj.intervallist(int).reference >= obj.intervallist(rint).frames(1)  &&...
                          obj.intervallist(int).reference <= obj.intervallist(rint).frames(2) );
-                            ind=rint;
-                            break;  % break inner loop once found
+                            ind=rint;   % save info about RF in an excluded interval
+                            break;      % break inner loop once 'rint' is found
                         end
                     end
-                    if (ind~=0) % reference frame belongs to a failed interval
+                    if (ind~=0) % reference frame belongs to a failed interval; 'ind' is the number of that interval
                         hwarn = warndlg(strjoin({'Unstrained distance for interval',num2str(int), 'refers to the frame',...
                             num2str(obj.intervallist(int).reference), 'which is a member of interval',[num2str(ind),','],...
-                            'but this interval was excluded, because a falure occured during its processing.',...
-                            'The interval',num2str(int),'was thus excluded from further analysis. If You wish to have it included,'...
-                            'You may particularly narrow down the interval around the frame of reference distance, to',...
-                            'minimize chance of failure in that interval.'}),...
+                            'but this interval was excluded, because a faluire occured during its processing.',...
+                            'The interval',num2str(int),'was thus excluded from further analysis, because its deformation',...
+                            'could not be calibrated. If You wish to have it included,'...
+                            'try to narrow down the interval around the frame of reference (unstrained) distance, to',...
+                            'minimize chance of failure in that interval. One-frame intervals are permissible.'}),...
                             'Failed interval of reference frame', 'replace');
                     else    % the setting of the reference frame is messed up
                         hwarn = warndlg(strjoin({'Unstrained distance for interval',num2str(int), 'refers to the frame',...
                             num2str(obj.intervallist(int).reference), 'which is not member of any analyzed interval.',...
                             'The interval was excluded from further analysis. If You wish to have it included,'...
-                            'double check the settings, update the calculation and try again.'}),...
+                            'double check the settings, update the calculation object and try again.'}),...
                             'Misplaced reference frame', 'replace');                        
                     end  
                     uiwait(hwarn);
@@ -799,7 +823,7 @@ function [badInts] = fillHoles(badFrames)
     badInts = findIntervals(badFrames);
 
     for int=size(badInts,1):-1:1    % prune lone standing badFrames
-        if badInts(int,2)-badInts(int,1) <= 8; badInts(int,:) = [];
+        if badInts(int,2)-badInts(int,1) <= 15; badInts(int,:) = [];
         else % erode dilated frames
             badInts(int,1) = max(badInts(int,1)+3,1);
             badInts(int,2) = min(badInts(int,2)-3,ne);
