@@ -300,20 +300,11 @@ classdef BFPClass < handle
                 lfrmB = min(lfrm, ffrm-1+size(obj.beadPositions(int).coor,1) ); % pipette last frame #
                 
                 if strcmp(style,'F')
-                    plot( hplot, ffrm:lfrm, obj.force(int).values(start:stop),'g','HitTest','off' );
-                    hp_position = hplot.Position;
-                    ax2 = axes('Position',hp_position,'YAxisLocation','right','Color','none');
-                    set(ax2,'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
-                    ax2.YLim = hplot.YLim/obj.k;
-                    ax2.XLabel = [];
-                    ax2.XTickLabelMode = 'manual';
-                    ax2.XTickLabel = [];
-                    ax2.Tag = 'deformationaxis';
+                    plot( hplot, ffrm:lfrm, obj.force(int).values(start:stop),'g','HitTest','off');
                     lh = legend(hplot,'force');
                     th = title(hplot, 'Force [pN]','Color','green', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     xlabel(hplot, 'time [frames]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     ylabel(hplot, 'Force [pN]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
-                    ylabel(ax2,'Deformation [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     hold on;
                     
                 else
@@ -371,6 +362,26 @@ classdef BFPClass < handle
                 th.FontUnits = 'normalized';
                 th.FontSize = BFPClass.labelfontsize;
             end
+            
+            % no extra space around
+            if strcmp(style,'F')||strcmp(style,'M')
+                hplot.XLim=[fInd,lInd];
+            end
+            
+            if strcmp(style,'F')
+                hp_position = hplot.Position;
+                ax2 = axes('Position',hp_position,'YAxisLocation','right','Color','none');
+                set(ax2,'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                ax2.XLabel = [];
+                ax2.XTickLabelMode = 'manual';
+                ax2.XTickLabel = [];
+                ax2.XTickMode = 'manual';
+                ax2.XTick = [];
+                ax2.Tag = 'deformationaxis';
+                ax2.YLim = hplot.YLim/obj.k;
+                ax2.XLim=[fInd,lInd];
+                ylabel(ax2,'Deformation [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+            end;
             
         end
         

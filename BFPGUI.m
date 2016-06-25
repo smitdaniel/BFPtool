@@ -1401,6 +1401,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             case 4  % force
                 BFPobj.plotTracks(handles.hgraph,handles.lowplot,handles.highplot,false,false,'Style','F');
                 handles.thisRange = [handles.lowplot, handles.highplot];
+                uistack(handles.hgraph,'top');
                 if numel(BFPobj.force)~=0;
                     plotZeroLine();     % plots dashed red line at y=0 to indicate pulling and pushing
                 end;

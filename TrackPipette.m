@@ -35,7 +35,7 @@ defaultReview       = 5;          % number of frames used to evaluate metric
 defaultRobustness   = 0.95;       % level of correlation to result in warning
 defaultImageQuality = 0.96;       % level of relative contrast (to maximum) to issue warning
 defaultWideField    = false;      % perform serach in the full field
-defaultStrongRobust = 0.97;       % minimal robustness requirement
+defaultStrongRobust = 0.90;       % minimal robustness requirement
 defaultBuffer       = 5;          % grace period if search for pattern fails
 defaultWaitbar      = [];
 

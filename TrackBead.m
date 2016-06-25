@@ -181,7 +181,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     distance = [0,10 + failcounter*5];  % [ index, distance]; initial 'index=0' signals failed detection
     for i=1:size(centre,1)              % go through detected centres
         tmpCentre = [centre(i,2) + box(1,1) - 1, centre(i,1) + box(1,2) - 1]; % transform to coordinates [r,c]
-        tmpMoved = norm(centres(max(frames-1,1),:) - tmpCentre)/metric(i);    % calc the distance between the frames
+        tmpMoved = norm(centres(max(frames-1,1),:) - tmpCentre)/metric(i);    % calc the distance between the frames and normalize by metric value
         if(tmpMoved < distance(2) && rad(i) >= radius(1) && rad(i) <= radius(2) ); distance = [i,tmpMoved]; end;   % choose the closest bead
     end;
 
