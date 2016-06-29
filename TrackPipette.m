@@ -35,7 +35,7 @@ defaultReview       = 5;          % number of frames used to evaluate metric
 defaultRobustness   = 0.95;       % level of correlation to result in warning
 defaultImageQuality = 0.96;       % level of relative contrast (to maximum) to issue warning
 defaultWideField    = false;      % perform serach in the full field
-defaultStrongRobust = 0.90;       % minimal robustness requirement
+defaultStrongRobust = 0.80;       % minimal robustness requirement
 defaultBuffer       = 5;          % grace period if search for pattern fails
 defaultWaitbar      = [];
 
@@ -150,7 +150,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     subframe = double(frame.cdata( box(1,1):box(2,1), box(1,2):box(2,2) ));   % area to search for the pipette
     
     % check if the presumed pattern is not out of field => failed tracking
-    if (any(size(subframe) < size(pipette) )) 
+    if (any(size(subframe) < pipDim )) 
         cleanBreak(false);
         warndlg(strjoin({'At frame', num2str(thisFrame), 'position of the detected pattern upper left anchor is',...
             strcat('[',num2str(round(index(2))),',',num2str(round(index(1))),']'),'too near to the edge of the field.',...

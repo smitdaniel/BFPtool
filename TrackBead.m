@@ -178,11 +178,13 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     metric = [metric; metricPC ];
 
     % select the strongest circle: select the closest bead,metric-weighted
-    distance = [0,10 + failcounter*5];  % [ index, distance]; initial 'index=0' signals failed detection
+    distance = [0, 0];  % [ index, distance]; initial 'index=0' signals failed detection
     for i=1:size(centre,1)              % go through detected centres
         tmpCentre = [centre(i,2) + box(1,1) - 1, centre(i,1) + box(1,2) - 1]; % transform to coordinates [r,c]
-        tmpMoved = norm(centres(max(frames-1,1),:) - tmpCentre)/metric(i);    % calc the distance between the frames and normalize by metric value
-        if(tmpMoved < distance(2) && rad(i) >= radius(1) && rad(i) <= radius(2) ); distance = [i,tmpMoved]; end;   % choose the closest bead
+        tmpDist = max( norm(centres(max(frames-1,1),:)-tmpCentre), radius(1) )/radius(1);
+%        tmpMoved = max(norm(centres(max(frames-1,1),:) - tmpCentre),radius(1))/metric(i);    % calc the distance between the frames and normalize by metric value
+        tmpMoved = metric(i) / tmpDist; 
+        if(tmpMoved > distance(2) && rad(i) >= radius(1) && rad(i) <= radius(2) ); distance = [i,tmpMoved]; end;   % choose the closest bead
     end;
 
     if( distance(1) == 0 && failcounter < buffer )     % failed to detect anything - 'buffer' consecutive failed detections allowed
@@ -257,7 +259,8 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     metrics(frames,:) = metric;
     if metric < robust; badFrames(frames,:) = true; end;
 
-    radius = [max(floor(rad-4),haradius(1)), min(ceil(rad+4),haradius(2))];    % modify the radius interval (not over 18)
+    radius = [max(floor(rad-4),haradius(1)), min(ceil(rad+4),haradius(2))]; % modify the radius interval (not over 18)
+    if radius(2)<= radius(1); radius=haradius; end;                         % if radius setting fails, reset
     box = [floor(centre - side); ceil(centre + side)];                      % modify the bounding box for the next search
     box(1,1) = max(box(1,1),1);         % do not let the box outside ...
     box(1,2) = max(box(1,2),1);         % ... the frame field

@@ -102,11 +102,11 @@ classdef vidWrap < handle
             if obj.istiff
                 if index ~= 0;
                     obj.vidObj.setDirectory(index);
-                    frame.cdata = obj.vidObj.read();
+                    frame.cdata = obj.setGray(obj.vidObj.read());
                     obj.CurrentFrame = index;
                 else
                     obj.vidObj.setDirectory( min(obj.CurrentFrame+1, obj.Frames) ); % read next
-                    frame.cdata = obj.vidObj.read();
+                    frame.cdata = obj.setGray(obj.vidObj.read());
                     obj.CurrentFrame = obj.CurrentFrame + 1;
                 end
             else
