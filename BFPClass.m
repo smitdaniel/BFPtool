@@ -234,20 +234,27 @@ classdef BFPClass < handle
         
         % plots detected tracks; in 3D, the z-dimension is the time axis
         function [] = plotTracks(obj, hplot, varargin )
-            inp = inputParser();
-            defaultFirst = 1;
-            defaultLast  = obj.intervallist(end).frames(2);
-            defaultBead  = true;
-            defaultPip   = true;
-            defaultStyle = '3D';
+            
+            persistent inp;
             styleList = {'2D','3D','F','M'};    % trajectory, track, force, metric
             
-            addRequired(inp,'hplot');   % handle to axes
-            addOptional(inp,'fInd',defaultFirst, @(x) (x > 0 && x <= defaultLast && isnumeric(x)));
-            addOptional(inp,'lInd',defaultLast, @(x) (x > 0 && isnumeric(x)));
-            addOptional(inp,'pip' ,defaultPip,  @islogical);
-            addOptional(inp,'bead',defaultBead, @islogical);
-            addParameter(inp,'Style',defaultStyle, @(x) any(validatestring(x,styleList)));
+            if isempty(inp)
+                inp = inputParser();
+                defaultFirst = 1;
+                defaultLast  = obj.intervallist(end).frames(2);
+                defaultBead  = true;
+                defaultPip   = true;
+                defaultStyle = '3D';      
+                defaultCalib = false;
+
+                addRequired(inp,'hplot');   % handle to axes
+                addOptional(inp,'fInd',defaultFirst, @(x) (x > 0 && x <= defaultLast && isnumeric(x)));
+                addOptional(inp,'lInd',defaultLast, @(x) (x > 0 && isnumeric(x)));
+                addOptional(inp,'pip' ,defaultPip,  @islogical);
+                addOptional(inp,'bead',defaultBead, @islogical);
+                addParameter(inp,'Style',defaultStyle, @(x) any(validatestring(x,styleList)));
+                addParameter(inp,'Calibration', defaultCalib, @islogical);
+            end
             
             parse(inp,hplot,varargin{:});
             hplot = inp.Results.hplot;
@@ -256,6 +263,7 @@ classdef BFPClass < handle
             pip   = inp.Results.pip;
             bead  = inp.Results.bead;
             style = inp.Results.Style;
+            calib = inp.Results.Calibration;
             % ===========================            
             
             persistent ax2;
@@ -304,7 +312,11 @@ classdef BFPClass < handle
                     lh = legend(hplot,'force');
                     th = title(hplot, 'Force [pN]','Color','green', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     xlabel(hplot, 'time [frames]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
-                    ylabel(hplot, 'Force [pN]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    if calib
+                        ylabel(hplot, 'Force [pN]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    else
+                        ylabel(hplot, 'uncalibrated force', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
+                    end
                     hold on;
                     
                 else
@@ -369,8 +381,10 @@ classdef BFPClass < handle
             end
             
             if strcmp(style,'F')
-                hp_position = hplot.Position;
-                ax2 = axes('Position',hp_position,'YAxisLocation','right','Color','none');
+                hp = hplot.Position;
+                hf = hplot.Parent;
+                ry_position = [ hp(1)+hp(3), hp(2), 0, hp(4)];
+                ax2 = axes('Parent',hf,'Position',ry_position,'YAxisLocation','right','Color','none', 'HitTest','off','PickableParts','none');
                 set(ax2,'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                 ax2.XLabel = [];
                 ax2.XTickLabelMode = 'manual';
@@ -379,7 +393,7 @@ classdef BFPClass < handle
                 ax2.XTick = [];
                 ax2.Tag = 'deformationaxis';
                 ax2.YLim = hplot.YLim/obj.k;
-                ax2.XLim=[fInd,lInd];
+                ax2.XLim=[0,1];
                 ylabel(ax2,'Deformation [\mu m]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
             end;
             
@@ -400,19 +414,23 @@ classdef BFPClass < handle
                         return
                 end;
             end;                
-                
-            inp = inputParser();
-            [defaultVideoPath,~,~] = fileparts(obj.vidObj.videopath);
-            defaultName = strcat(obj.name,'Tracks.avi');
-            defaultProfile = 'Motion JPEG AVI';
-            defaultFramerate = 10;
-            defaultSampling = 1;
             
-            addParameter(inp,'VideoPath',defaultVideoPath, @(x) exist(x,'dir') );
-            addParameter(inp,'Name', defaultName, @ischar);
-            addParameter(inp,'Profile', defaultProfile, @ischar);
-            addParameter(inp,'Framerate',defaultFramerate, @isnumeric);
-            addParameter(inp,'Sampling', defaultSampling, @isnumeric);
+            persistent inp;
+            
+            if isempty(inp);
+                inp = inputParser();
+                [defaultVideoPath,~,~] = fileparts(obj.vidObj.videopath);
+                defaultName = strcat(obj.name,'Tracks.avi');
+                defaultProfile = 'Motion JPEG AVI';
+                defaultFramerate = 10;
+                defaultSampling = 1;
+
+                addParameter(inp,'VideoPath',defaultVideoPath, @(x) exist(x,'dir') );
+                addParameter(inp,'Name', defaultName, @ischar);
+                addParameter(inp,'Profile', defaultProfile, @ischar);
+                addParameter(inp,'Framerate',defaultFramerate, @isnumeric);
+                addParameter(inp,'Sampling', defaultSampling, @isnumeric);
+            end
             
             parse(inp, varargin{:});
             
@@ -460,7 +478,7 @@ classdef BFPClass < handle
         
         
         % triggers force calculating procedure
-        function [overLimit] = getForce(obj, hplot)
+        function [overLimit] = getForce(obj, hplot, calib)
             
             overLimit = false;
             
@@ -572,7 +590,7 @@ classdef BFPClass < handle
 %                       obj.force(int).values,'g','HitTest','off' );
             end
             if any(refdist~=0);
-                obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,false,false,'Style','F');
+                obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,false,false,'Style','F','Calibration',calib);
             else
                 warndlg(strjoin({'No data interval could be matched with an appropriate reference'...
                     'distance frame. Tracking of the intervals either failed, or the settings were',...
@@ -625,13 +643,17 @@ classdef BFPClass < handle
         % x-coordinate, third column y-coordinate
         function importData(obj,type,data,varargin)
             
-            inp = inputParser();
-            defaultRange = [ min(data(:,1)), max(data(:,1)) ];
+            persistent inp;
             expectedTypes = { 'force', 'beadPositions', 'pipPositions' };
             
-            inp.addRequired( 'type', @(x) any(validatestring(x,expectedTypes)) );
-            inp.addRequired( 'data', @isnumeric );
-            inp.addParameter('range', defaultRange, @(x) (isnumeric(x) && numel(x)==2 && x(1) > 0 && x(2) > 0 && x(2) >= x(1)) );
+            if isempty(inp)
+                inp = inputParser();
+                defaultRange = [ min(data(:,1)), max(data(:,1)) ];                
+
+                inp.addRequired( 'type', @(x) any(validatestring(x,expectedTypes)) );
+                inp.addRequired( 'data', @isnumeric );
+                inp.addParameter('range', defaultRange, @(x) (isnumeric(x) && numel(x)==2 && x(1) > 0 && x(2) > 0 && x(2) >= x(1)) );
+            end
             
             inp.parse(type,data);
             type = inp.Results.type;    % which data are imported/overwritten

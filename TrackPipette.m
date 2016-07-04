@@ -24,33 +24,40 @@
 
 function [ position, scores, badFrames ] = TrackPipette( vidObj, pipette, varargin )
 
-wbThresh = 100;     % minimal # of frames to initialize progress bar
+wbThresh = 100;         % minimal # of frames to initialize progress bar
+routineWF = 5;          % frame interval to repeat routine wide-field search
+dilatedRobust = 0.97;   % minimal correlation needed for dilated pat. search
+maxSkip = 5;            % maximal displacement of the pattern in one frame in pix
 
+persistent inp;
 % parse the input; in case initial coordinate and range are not provided,
 % continue by taking the whole range and search the whole field.
-inp = inputParser;
-defaultInicoor      = [-1 -1];
-defaultRange        = -1;
-defaultReview       = 5;          % number of frames used to evaluate metric
-defaultRobustness   = 0.95;       % level of correlation to result in warning
-defaultImageQuality = 0.96;       % level of relative contrast (to maximum) to issue warning
-defaultWideField    = false;      % perform serach in the full field
-defaultStrongRobust = 0.80;       % minimal robustness requirement
-defaultBuffer       = 5;          % grace period if search for pattern fails
-defaultWaitbar      = [];
-
-addRequired(inp,'vidObj');
-addRequired(inp,'pattern');
-addOptional(inp,'inicoor', defaultInicoor);
-addOptional(inp,'range', defaultRange, @(r) (numel(r)==1 || numel(r)==2));
-addParameter(inp,'review', defaultReview, @isnumeric);
-addParameter(inp,'robustness', defaultRobustness, @isnumeric);
-addParameter(inp,'quality', defaultImageQuality, @isnumeric);
-addParameter(inp,'wideField', defaultWideField, @islogical);
-addParameter(inp,'buffer', defaultBuffer, @(x) ( ~isnan(x) && x > 0) );
-addParameter(inp,'waitbar', defaultWaitbar, @isgraphics)
+if isempty(inp)
+    inp = inputParser;
+    defaultInicoor      = [-1 -1];
+    defaultRange        = -1;
+    defaultReview       = 5;          % number of frames used to evaluate metric
+    defaultRobustness   = 0.95;       % level of correlation to result in warning
+    defaultImageQuality = 0.96;       % level of relative contrast (to maximum) to issue warning
+    defaultWideField    = false;      % perform serach in the full field    
+    defaultBuffer       = 5;          % grace period if search for pattern fails
+    defaultWaitbar      = [];
+    
+    addRequired(inp,'vidObj');
+    addRequired(inp,'pattern');
+    addOptional(inp,'inicoor', defaultInicoor);
+    addOptional(inp,'range', defaultRange, @(r) (numel(r)==1 || numel(r)==2));
+    addParameter(inp,'review', defaultReview, @isnumeric);
+    addParameter(inp,'robustness', defaultRobustness, @isnumeric);
+    addParameter(inp,'quality', defaultImageQuality, @isnumeric);
+    addParameter(inp,'wideField', defaultWideField, @islogical);
+    addParameter(inp,'buffer', defaultBuffer, @(x) ( ~isnan(x) && x > 0) );
+    addParameter(inp,'waitbar', defaultWaitbar, @isgraphics)
+end
 
 parse(inp, vidObj, pipette, varargin{:} );
+
+defaultStrongRobust = min(0.80, inp.Results.robustness);       % minimal-robustness requirement; 0.8 at most
 
 vidObj  = inp.Results.vidObj;
 pipette = double(inp.Results.pattern);
@@ -69,8 +76,8 @@ end
 framesToPass = range(2)-range(1)+1;
 inicoor = [ inp.Results.inicoor(2), inp.Results.inicoor(1) ];
 review  = round(inp.Results.review);
-robust  = [ inp.Results.robustness, (1+inp.Results.robustness)/2, defaultStrongRobust ];
-quality = [ inp.Results.quality, (1+inp.Results.quality)/2 ];
+robust  = [ defaultStrongRobust, inp.Results.robustness, (1+inp.Results.robustness)/2 ];    % robust(1) most severe -> robust(3) routine checking
+quality = [ inp.Results.quality, (1+inp.Results.quality)/2 ];                               % quality(1) contrast problems threshold -> quality(2) routine checking
 wideField = inp.Results.wideField;
 buffer  = inp.Results.buffer;
 warnSev = [ 1, 1, 1 ];  % frame the last warning was issued (severity 1,2,3)
@@ -81,6 +88,7 @@ if isempty(inp.Results.waitbar) && framesToPass < wbThresh;
 else
     tbSwitch = true;
     htrackbar = inp.Results.waitbar;
+    wbStep = ceil(framesToPass/100);      % redraw after 1 %
 end;
 % ======================================================================
 
@@ -136,12 +144,16 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
             return; 
         end;
         
-        trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
-        htrackbar.UserData.pipmsg = strjoin({'Tracking pipette',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
-            char(10),'of the current tracking interval.',char(10),'Finished',...
-            num2str(round(trackedRatio*100)),'% of total.'});
-        wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.pipmsg});
-        waitbar(trackedRatio,htrackbar,wbmsg);
+        
+        % update WB every 1%
+        if ~mod(frames-1,wbStep)
+            trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
+            htrackbar.UserData.pipmsg = strjoin({'Tracking pipette',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
+                char(10),'of the current tracking interval.',char(10),'Finished',...
+                num2str(round(trackedRatio*100)),'% of total.'});
+            wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.pipmsg});
+            waitbar(trackedRatio,htrackbar,wbmsg);
+        end
     end
     
     % ====  TRACKING SECTION  ====
@@ -173,11 +185,11 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     % treat unsucessful searches, 5 failure grace period allowed; old value
     % is coppied for the next round
     if( isOut() );
-        if (~single); wideFieldSearch(2); end;         % attempt full field search correction
+        if (~single); wideFieldSearch(2); end;          % attempt full field search correction
         if( isOut() );
             sortScore = sort(score(:),'descend');
             tmpScore = [0,0];
-            for ss = sortScore'
+            for ss = sortScore'                         % find the strongest response in the proper field 
                 [tmpScore(1),tmpScore(2)] = find(score==ss,1);
                 if isOut(tmpScore); continue;
                 else
@@ -187,7 +199,8 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
                 end;
             end;
         end;
-
+        
+        % if the pipette is still outside the field
         if( isOut() )
             failures = failures + 1;    % increment failure and issue warning
             if (failures < buffer);
@@ -240,21 +253,23 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
     if (range(2)-range(1) > review && ~single)  % if analyses enough frames
         metricTest = mean(scores(max(frames-review,1):frames,:));
         
-        % metric test, mild metric underperformance, repeat test occassion.
-        if( metricTest < robust(3) && metricTest > robust(2) || contrastTest < quality(2) )...
-          && frames-lastWF >= 5;          % minor drop in xcorr or contrast; tested more than 5 frames ago
-            [~] = wideFieldSearch(3);     % returns true if detection improved; rearch the whole field
+        % metric test, mild metric underperformance, repeat test
+        % occassionally, this is a routine testing
+        if( metricTest < robust(3) && metricTest > robust(2) || contrastTest < quality(1) )...
+          && frames-lastWF >= routineWF;  % minor drop in xcorr or contrast; tested more than 5 frames ago
+            [~] = wideFieldSearch(3);     % returns true if detection improved; rearch the whole field; metrics are relaxed, if no improvement is returned
             lastWF = frames;
         end;
                 
-        if( metricTest <= robust(2) && lastWF ~= frames)       % major drop in xcorr metric
+        % these methods fire up when problems occur
+        if( metricTest <= robust(2) && lastWF ~= frames)       % major drop in xcorr metric and no WF this turn
             wideFieldSearch(2);
             lastWF = frames;
             if metricTest <= robust(2);     % metric is still too poor
-                dilatedPatternSearch(1);
+                dilatedPatternSearch(-1);
                 if metricTest <= robust(1)  % the xcorr is failing;
                     badFrames(frames,:) = true;
-                    if strcmp(choice,'report') && frames-warnSev(1) > 10;
+                    if strcmp(choice,'report') && frames-warnSev(1) >= 10;
                     choice = questdlg(strjoin({'The frame',num2str(thisFrame),'in the interval missed the quality requirements.',...
                         'The metric reads',num2str(round(metricTest,3)),'below threshold',num2str(round(robust(1),3)),...
                         'It is likely more problems will follow.',...
@@ -269,11 +284,11 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
                         return;
                     end
                     end
-                elseif metricTest <= robust(2) && frames-warnSev(2) > 10;
+                elseif metricTest <= robust(2) && frames-warnSev(2) >= 10;
                     warning(strjoin({'At frame %d, the detection experiences severe uncertainty,',...
-                        'but still remains above the threshold.',...
+                        'but still remains above the minimum threshold.',...
                         'Corrective measures were not sufficient.',...
-                        'The metric is %.3f above threshold %.3f '}), thisFrame, metricTest, robust(1));
+                        'The metric is %.3f above the minimum threshold %.3f '}), thisFrame, metricTest, robust(1));
                     warnSev(2) = frames;
                 end
             end
@@ -282,12 +297,14 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
         
     if (~single)         
         dist = norm( index - lastPosition(true) );
-        if dist > 5;
+        if dist > maxSkip; [~] = wideFieldSearch(0); end;   % verify by WF (with suppressed reports)
+        dist = norm( index - lastPosition(true) );
+        if dist > maxSkip;  % if WF did not improve the large skip
             badFrames(frames,:) = true;
-            if frames - warnSev(1) > 10;
+            if frames - warnSev(1) >= 10;
                 warning(strjoin({'At frame %d a suspiciously large displacement of pipette occured, %.1f pixels.',...
                 'Anything above %d pixels is considered suspicious. Frame was logged as a bad frame.'}),...
-                thisFrame,dist,5);
+                thisFrame,dist,maxSkip);
                 warnSev(1) = frames;
             end;
         end
@@ -320,22 +337,23 @@ end;
             maxscore           = wfMet;
             metricTest = mean(scores(max(frames-review,1):frames,:));   % try if new metric passes the test
             improved = true;
-            if S==3,robust(3) = min( robust(3)+0.005, defaultStrongRobust); end;
-        else                    % there is no improvement
-            if frames-warnSev(S) > 10;  % display warning at most every 10 frames
+            if S==3;robust(3) = min( robust(3)+0.005, (1+robust(2))/2 ); end;   % if the method improves results (and was desensitized before), increase sensitivity again
+        elseif S~=0                      % there is no improvement; S==0 means no reports, no modifications
+            if frames-warnSev(S) >= 10;  % display warning at most every 10 frames
                 warning(strjoin({'At frame %d, the pipette correlation metric dropped to %.3f.',...
                 'The contrast metric dropped to %.3f.'}), range(1)-1+frames, metricTest, contrastTest );
             end;    
-            if S==3;robust(3) = max( robust(3)-0.005, robust(2) );end;  % desensitize the control
+            if S==3;robust(3) = max( robust(3)-0.005, robust(2) );end;  % desensitize the control, if no results are produced, call less often
             warnSev(S) = frames;
+            improved = false;
+        else
             improved = false;
         end;
     end
     
     % in case of low metric results, the program tries to increase match
-    % by selecting larger/smaller pattern than initially. The pattern is 
-    % dilated/eroded by C-pixels in every direction.
-    % C > 0 is erosion, C > dilatation
+    % by selecting larger pattern than initially. The pattern is 
+    % dilated by C-pixels in every direction.
     function [improved] = dilatedPatternSearch(C)
         % tries to localte the pattern in interval's first frame. If
         % detection is reliable enough, continues with the procedure. The
@@ -352,15 +370,15 @@ end;
         if isempty(wfMet)
             [wfPos,wfMet] = TrackPipette( vidObj, pipette, [inicoor(2),inicoor(1)], range(1),'wideField',true);   % search the original pattern in the first wide field frame
         end;
-        if wfMet < defaultStrongRobust;    % if pattern at intervals init. frame matches orig. pattern less than 97%, abort
+        if wfMet < dilatedRobust;    % if pattern at intervals init. frame matches orig. pattern less than dilatedRobust, abort
             improved = false;
             confirmed = false;
-            warndlg(strjoin({'Method attempts to improve detection by trying to erode or dilate the',...
+            warndlg(strjoin({'Method attempts to improve detection by trying to dilate the',...
                 'pipette pattern. It was, however, impossible to precisely localize the pattern at the',...
                 'first frame, frame',num2str(range(1)),', of the analyzed interval. With correlation',...
-                num2str(wfMet),'not meeting the required strength of',num2str(defaultStrongRobust),...
+                num2str(wfMet),'not meeting the required strength of',num2str(dilatedRobust),...
                 'Program will continue without the feature. You can try to resolve the problem by',...
-                'relaxing the strength requirement, or choosing another pattern.'}));
+                ' choosing another pattern.'}));
             return;
         end;
 
@@ -368,22 +386,22 @@ end;
         if isempty(dilPipette)
             firstFrame = vidObj.readFrame(range(1));    % read the first frame of the interval
             wfPos = round(wfPos);
-            dilFrame = [ max( wfPos(1)+C,1 ), min(wfPos(1)-1-C+pipDim(1),frameDim(1)); ...
-                         max( wfPos(2)+C,1 ), min(wfPos(2)-1-C+pipDim(2),frameDim(2))];
+            dilFrame = [ max( wfPos(1)-C,1 ), min(wfPos(1)-1+C+pipDim(1),frameDim(1)); ...
+                         max( wfPos(2)-C,1 ), min(wfPos(2)-1+C+pipDim(2),frameDim(2))];
             dilPipette = double(firstFrame.cdata( dilFrame(1,1):dilFrame(1,2), dilFrame(2,1):dilFrame(2,2),: ));    % pipette pattern dilated by 2 pixels on each side
         end
         
-        [dpPos,dpMet] = TrackPipette( vidObj, dilPipette, lastPosition()+[C,C], thisFrame);  % search dilated pipette in the box
+        [dpPos,dpMet] = TrackPipette( vidObj, dilPipette, lastPosition()-[C,C], thisFrame);  % search dilated pipette in the box
             
         if dpMet > maxscore     % improvement
-            index              = dpPos - [C,C];
+            index              = dpPos + [C,C];
             position(frames,:) = index;
             scores(frames,:)   = dpMet;
             maxscore           = dpMet;
             metricTest = mean(scores(max(frames-review,1):frames,:));   % try if new metric passes the test
             improved = true;
         else
-            if frames-warnSev(2) > 10;  % display warning at most every 10 frames
+            if frames-warnSev(2) >= 10;  % display warning at most every 10 frames
                 warning(strjoin({'At frame %d, the pipette correlation metric dropped to %.3f.',...
                 'The lowest threshold value is %.3f.'}), range(1)-1+frames, metricTest, robust(1) );
                 warnSev(2) = frames;

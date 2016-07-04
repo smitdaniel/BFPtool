@@ -138,17 +138,20 @@ classdef vidWrap < handle
         % the user.
         function [ contrast, meanGray ] = getContrast(obj, ffrm, lfrm, varargin)
             
-            inp = inputParser;
+            persistent inp;
             
-            defaultType     = 1;    % contrast SD2 code
-            defaultrVarWW   = obj.rollVarWidth; % default window width rSD2
-            
-            inp.addRequired('obj');
-            inp.addRequired('ffrm');    % initial requested frm
-            inp.addRequired('lfrm');    % final requested frm
-            inp.addOptional('type', defaultType, @isfloat);       % type of contrast metric
-            inp.addOptional('rVarWW', defaultrVarWW, @isfloat);   % width of the rSD2 window
-            
+            if isempty(inp)
+                inp = inputParser;
+                defaultType     = 1;    % contrast SD2 code
+                defaultrVarWW   = obj.rollVarWidth; % default window width rSD2
+
+                inp.addRequired('obj');
+                inp.addRequired('ffrm');    % initial requested frm
+                inp.addRequired('lfrm');    % final requested frm
+                inp.addOptional('type', defaultType, @isfloat);       % type of contrast metric
+                inp.addOptional('rVarWW', defaultrVarWW, @isfloat);   % width of the rSD2 window
+            end
+                
             inp.parse(obj, ffrm, lfrm ,varargin{:});
 
             obj = inp.Results.obj;

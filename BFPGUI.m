@@ -25,14 +25,14 @@ function [ backdoorObj ] = BFPGUI( varargin )
         end;
     end
 
-    inp = inputParser();
+    inpMain = inputParser();
     noLoad = false;
     
-    addOptional(inp,'loadData', noLoad, @isMatFile)
+    addOptional(inpMain,'loadData', noLoad, @isMatFile)
     
-    inp.parse(varargin{:});
+    inpMain.parse(varargin{:});
     
-    loadData = inp.Results.loadData;
+    loadData = inpMain.Results.loadData;
     
 % ===================================================================
 
@@ -118,6 +118,7 @@ handles.hzeroline = [];     % handle of a line representing a zero force
 handles.pushtxt   = [];     % texthandle for a pushing region descriptor ...
 handles.pulltxt   = [];     % ... and the like for pulling region
 handles.contype   = 1;      % type of contrast metric to display (1=SD2, 2=rSD2; see documentation)
+handles.calibrated= false;  % flags if the calculated force is calibrated (before force calculation if always false)
 
 % lists of UI handles for export/import; mutable handles
 GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
@@ -158,7 +159,7 @@ GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ..
             'tmppatframe', 'interval', 'intervallist', 'remove', 'updpatframe',...
             'calibint', 'lowplot', 'highplot', 'toPlot', 'thisPlot', 'thisRange',...
             'fitInt', 'kernelWidth', 'noiseThresh', 'minLength', 'hzeroline',...
-            'pushtxt', 'pulltxt', 'contype' };
+            'pushtxt', 'pulltxt', 'contype', 'calibrated' };
         
         
 % ================= SETTING UP GUI CONTROLS =========================
@@ -1399,9 +1400,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     return;
                 end
             case 4  % force
-                BFPobj.plotTracks(handles.hgraph,handles.lowplot,handles.highplot,false,false,'Style','F');
+                BFPobj.plotTracks(handles.hgraph,handles.lowplot,handles.highplot,false,false,'Style','F','Calibration',handles.calibrated);
                 handles.thisRange = [handles.lowplot, handles.highplot];
-                uistack(handles.hgraph,'top');
                 if numel(BFPobj.force)~=0;
                     plotZeroLine();     % plots dashed red line at y=0 to indicate pulling and pushing
                 end;
@@ -1447,19 +1447,23 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % gets parameters for calculation, calculates (&shows) 'k', gets force
     function runforce_callback(~,~)
         % if verbose and geometric parameters were not changed, warn
-        if handles.verbose && (handles.RBCradius == RBC && handles.PIPradius == PIP &&...
-                               handles.CAradius == CON)
-            choice = questdlg(strjoin({'This action runs force calculation. The force, however,',...
-                'must be calibrated (i.e. stiffness ''k'' calculated) using experiment settings dependent parameters',...
-                'adjustable in ''Experimental parameters'' panel. Initially, it contains only order of magnitude',...
-                'values, to give an idea of force time dependence. If You want to have results properly',...
-                'calibrated for Your experiment, please review these values before the calculation.'}),...
-                'Parameters for force calculation', 'Review', 'Proceed', 'Review');
-            if strcmp(choice,'Review'); return; end;
-        end;
+        if (handles.RBCradius == RBC && handles.PIPradius == PIP && handles.CAradius == CON)    % nothing measured
+            if handles.verbose  % report
+                choice = questdlg(strjoin({'This action runs force calculation. The force, however,',...
+                    'must be calibrated (i.e. stiffness ''k'' calculated) using experiment settings dependent parameters',...
+                    'adjustable in ''Experimental parameters'' panel. Initially, it contains only order of magnitude',...
+                    'values, to give an idea of force time dependence. If You want to have results properly',...
+                    'calibrated for Your experiment, please review these values before the calculation.'}),...
+                    'Parameters for force calculation', 'Review', 'Proceed', 'Review');
+                if strcmp(choice,'Review'); return; end;
+            end;
+            handles.calibrated = false; % mark not calibrated and continue
+        else
+            handles.calibrated = true;   % likely calibration occured; set force to calibrated
+        end
         BFPobj.getParameters(handles.RBCradius, handles.CAradius, handles.PIPradius, handles.pressure);
         handles.stiffness = BFPobj.k;
-        handles.overLimit = BFPobj.getForce(handles.hgraph);
+        handles.overLimit = BFPobj.getForce(handles.hgraph, handles.calibrated);
         handles.hlinearinfo.Enable = 'on';
         handles.hstiffbtn.Enable = 'on';
         handles.toPlot = 4;
@@ -2809,18 +2813,23 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % detect and return bead information
     function [ beadinfo,pass,rad ] = getBead( source,tag, varargin )
         
+        persistent inpar;   % persistent parser, created only once
+        
+        % create parser instance, if not present
+        if isempty(inpar)            
+            inpar = inputParser();
+            defaultAxHandle = handles.haxes;    % default axes are main figure axes
+            defaultFrame    = vidObj.CurrentFrame;
+            defaultCallback = @getpoint_callback;   % to reset source cbk
+
+            inpar.addRequired('source');    % calling uicontrol
+            inpar.addRequired('tag');       % call from list or direct
+            inpar.addParameter('hax', defaultAxHandle, @isgraphics);
+            inpar.addParameter('frm', defaultFrame, @isfloat);
+            inpar.addParameter('cbk', defaultCallback );
+        end
+        
         % parse the inputs (they should allow overloads in Matlab...)
-        inpar = inputParser;
-        defaultAxHandle = handles.haxes;    % default axes are main figure axes
-        defaultFrame    = vidObj.CurrentFrame;
-        defaultCallback = @getpoint_callback;   % to reset source cbk
-        
-        inpar.addRequired('source');    % calling uicontrol
-        inpar.addRequired('tag');       % call from list or direct
-        inpar.addParameter('hax', defaultAxHandle, @isgraphics);
-        inpar.addParameter('frm', defaultFrame, @isfloat);
-        inpar.addParameter('cbk', defaultCallback );
-        
         inpar.parse(source,tag,varargin{:});
         
         source = inpar.Results.source;
@@ -3052,13 +3061,19 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % fits data with one-parametric exponentiel
     function [ est, FitCurve ] = expfit( int, frc, varargin )
             
-            inp = inputParser();
-            defaultRate = 1;
+            persistent inp;
+    
+            % create the parser, if doesn't exist
+            if isempty(inp)
+                inp = inputParser();
+                defaultRate = 1;
+
+                addRequired(inp, 'int');
+                addRequired(inp, 'frc');
+                addParameter(inp, 'framerate', defaultRate, @isnumeric);
+            end;
             
-            addRequired(inp, 'int');
-            addRequired(inp, 'frc');
-            addParameter(inp, 'framerate', defaultRate, @isnumeric);
-            
+            % parse the inputs
             inp.parse(int, frc, varargin{:});
             
             int = inp.Results.int;

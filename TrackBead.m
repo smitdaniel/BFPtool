@@ -1,28 +1,32 @@
-%TrackBead Uses matlab function do detect dark or bright circles
-%   IN:
-%   vidObj  : object wrapping the video file
-%   contrast: contrast of the bead, either dark or bright
-%   inicoor : initial coordinate of the bead
+%% Function for tracking bead as s circular object
+%   TrackBead Uses Matlab function do detect dark or bright circles
+%   *IN:*
+%   * vidObj  : object wrapping the video file (vidWrap class)
+%   * contrast: contrast of the bead, either 'dark' or 'bright'
+%   * inicoor : initial coordinate of the bead
 %   varargin may contain the following:
-%   range   : the frame range to search for the bead
-%   radius  : range of radii of the bead
-%   buffer  : number of frames of failed detection before aborting
-%   sensitivity : sensitivity of the method
-%   edge    : edge sensitivity of the method
-%   side    : half-side of a box shaper area around last valid detection
-%             to search for the bead in the following frame
-%   robustness  : how bad can bead metric be
-%   imagequality: how bad can image be
-%   review  : number of frames averaged to get info about metric and contr.
-%   retries : number of retries for one frame (w/ relaxed conditions)
-%   retry   : call on this function is a retry from another function run
-%   waitbar : handle to figure of tracking progress bar started externally
-%   OUT:
-%   centres : centres of the detected bead, one centre per frame
-%   radii   : radius for each frame of detection
-%   metrics : detection strength of each frame
-%   badFrames   : frames, where detection failed - surrogative value used
-%   DETAIL:
+%   * range   : the frame range to search for the bead
+%   * radius  : range of radii of the bead
+%   * buffer  : number of frames of failed detection before aborting
+%   * sensitivity : sensitivity of the method
+%   * edge    : edge sensitivity of the method
+%   * side    : half-side of a box shaped area around the last valid detection
+%               to search for the bead in the following frame
+%   * robustness  : bead metric failure threshold
+%   * imagequality: image contrast (SD2) relative threshold
+%   * review  : number of frames averaged to get info about metric and contr.
+%   * retries : max number of retries for one frame (w/ relaxed conditions)
+%   * retry   : the flag stating that the call on this function is a retry 
+%               from another function run
+%   * waitbar : handle to figure of tracking progress bar started externally
+%   
+%   *OUT:*
+%   * centres : centres of the detected bead, one centre per frame
+%   * radii   : radius for each frame of detection
+%   * metrics : detection strength of each frame
+%   * badFrames   : frames, where detection failed - surrogative value used
+%   
+%   *DETAIL:*
 %   The method uses Matlab IP TB method 'imfindcircles' to detect circular
 %   objects (here the particular bead of interest), taking into account the
 %   spatial distance of the object between consecutive detections. The
@@ -31,40 +35,46 @@
 %   retries the selection with relaxed conditions several times. If the
 %   metrics or the contrast are poor, it issues warning.
 %   ===============================================================
+%%
 
 function [ centres, radii, metrics, badFrames ] = TrackBead( vidObj, contrast, inicoor, varargin )
 
+%% 
 wbThresh = 100;                     % minimal number of frames to track to generate a waitbar
 
-inp = inputParser;  
-defaultRange        = -1;           % range of frames to analyze
-defaultRadius       = [8,18];       % range of possible bead radii
-defaultBuffer       = 5;            % number of frames to recover
-defaultSensitivity  = 0.9;          % default general sensitivity of the method
-defaultEdge         = 0.2;          % default value for edge sensitivity
-defaultSide         = [25,25];      % half of the side of the box around the circle, where to search on the next frame
-defaultRobustness   = 0.8;          % level of bead metric considered too poor
-defaultImageQuality = 0.96;         % level of contrast considered too poor
-defaultReview       = 5;            % number of passed frames to calculate metric and contrast states
-defaultRetries      = 5;            % number of retries (conditions are relaxed during each retry)
-defaultWaitbar      = [];
-defaultRetry        = false;
+persistent inp;
 
-addRequired(inp,'vidObj');
-addRequired(inp,'contrast');
-addRequired(inp,'inicoor');
-addOptional(inp,'range',defaultRange,@isnumeric);
-addParameter(inp,'radius',defaultRadius,@isnumeric);
-addParameter(inp,'buffer',defaultBuffer,@(x) (isnumeric(x) && x > 0));
-addParameter(inp,'sensitivity',defaultSensitivity,@isnumeric);
-addParameter(inp,'edge',defaultEdge,@isnumeric);
-addParameter(inp,'side',defaultSide,@isnumeric);
-addParameter(inp,'robustness',defaultRobustness,@isnumeric);
-addParameter(inp,'quality',defaultImageQuality,@isnumeric);
-addParameter(inp,'review',defaultReview,@isnumeric);
-addParameter(inp,'retries',defaultRetries,@isnumeric);
-addParameter(inp,'waitbar',defaultWaitbar,@isgraphics);
-addParameter(inp,'retry', defaultRetry,@islogical)
+if isempty(inp)
+    inp = inputParser;  
+    defaultRange        = -1;           % range of frames to analyze
+    defaultRadius       = [8,18];       % range of possible bead radii
+    defaultBuffer       = 5;            % number of frames to recover
+    defaultSensitivity  = 0.9;          % default general sensitivity of the method
+    defaultEdge         = 0.2;          % default value for edge sensitivity
+    defaultSide         = [25,25];      % half of the side of the box around the circle, where to search on the next frame
+    defaultRobustness   = 0.8;          % level of bead metric considered too poor
+    defaultImageQuality = 0.96;         % level of contrast considered too poor
+    defaultReview       = 5;            % number of passed frames to calculate metric and contrast states
+    defaultRetries      = 5;            % number of retries (conditions are relaxed during each retry)
+    defaultWaitbar      = [];
+    defaultRetry        = false;
+
+    addRequired(inp,'vidObj');
+    addRequired(inp,'contrast');
+    addRequired(inp,'inicoor');
+    addOptional(inp,'range',defaultRange,@isnumeric);
+    addParameter(inp,'radius',defaultRadius,@isnumeric);
+    addParameter(inp,'buffer',defaultBuffer,@(x) (isnumeric(x) && x > 0));
+    addParameter(inp,'sensitivity',defaultSensitivity,@isnumeric);
+    addParameter(inp,'edge',defaultEdge,@isnumeric);
+    addParameter(inp,'side',defaultSide,@isnumeric);
+    addParameter(inp,'robustness',defaultRobustness,@isnumeric);
+    addParameter(inp,'quality',defaultImageQuality,@isnumeric);
+    addParameter(inp,'review',defaultReview,@isnumeric);
+    addParameter(inp,'retries',defaultRetries,@isnumeric);
+    addParameter(inp,'waitbar',defaultWaitbar,@isgraphics);
+    addParameter(inp,'retry', defaultRetry,@islogical)
+end
 
 parse(inp, vidObj, contrast, inicoor, varargin{:});
 
@@ -92,12 +102,14 @@ if isempty(inp.Results.waitbar) && framesToPass < wbThresh;
 else
     tbSwitch = true;
     htrackbar = inp.Results.waitbar;
+    wbStep = ceil(framesToPass/100);
 end;
 
 % save radius hard limits (global)
 haradius = radius;
+%%
 
-% =======================================================================
+%%% =======================================================================
 
 warn = 1;   % frame number of the last warning
 if (range == -1); range = [1, vidObj.Frames]; end;     % set full range, if not given
@@ -147,12 +159,15 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
             return; 
         end;
         
-        trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
-        htrackbar.UserData.beadmsg = strjoin({'Tracking bead',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
-            char(10),'of the current tracking interval.',char(10),'Finished',...
-            num2str(round(trackedRatio*100)),'% of total.'});
-        wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
-        waitbar(trackedRatio,htrackbar,wbmsg);
+        % update WB every 1%
+        if ~mod(frames-1,wbStep)
+            trackedRatio = (wereTracked + frames)/htrackbar.UserData.toBeTracked;
+            htrackbar.UserData.beadmsg = strjoin({'Tracking bead',char(10),'processing frame',strcat(num2str(frames),'/',num2str(framesToPass)),...
+                char(10),'of the current tracking interval.',char(10),'Finished',...
+                num2str(round(trackedRatio*100)),'% of total.'});
+            wbmsg = strjoin({htrackbar.UserData.intmsg,char(10),htrackbar.UserData.beadmsg});
+            waitbar(trackedRatio,htrackbar,wbmsg);
+        end
     end       
     
     % ====  THE TRACKING PART   ====
