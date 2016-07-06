@@ -1,21 +1,22 @@
-%   BFPGUI: Function running the BFPClass GUI
+%% BFPGUI: Function running the BFPClass GUI
 %   Manages the analysis of a BFP experiment recording. Takes inputs from
 %   the user and calls appropriate computational methods to track and
-%   calculate forces. It performs many mainainance tasks (e.g. basic
-%   fitting, measurements, fine-tuning of the detection, and import-export
+%   calculate forces. It performs many maintainance tasks (e.g. basic
+%   fitting, measurements, fine-tuning of the detection), and import-export
 %   tools.
-%   OUT: 
-%   backdoorObj: is a handle class object, which is connected to some of
+%   *OUT:*
+%   backdoorObj: is a handle superclass object, which is connected to some of
 %   the important parameters within the BFPClass and BFPGUI. It allows user
 %   to change these parameters from the Matlab command line. It is usually
-%   not necessary to access there paremeters.
-%   IN:
+%   not necessary to access these paremeters.
+%   *IN:*
 %   loadData (Optional): allows user to start GUI instance with data 
 %   imported from an older MAT file form earlier session or another machine
 %   ======================================================================
 
 function [ backdoorObj ] = BFPGUI( varargin )
 
+%% Importing data
     % verify if passed input is a MAT file
     function [is] = isMatFile(file)
         is = false;
@@ -36,7 +37,7 @@ function [ backdoorObj ] = BFPGUI( varargin )
     
 % ===================================================================
 
-% UI settings
+%% UI settings
 handles.verbose = true;     % sets UI to provide more (true) or less (false) messages
 handles.selecting = false;  % indicates, if selection is under way and blocks other callbacks of selection
 handles.fitfontsize = 0.07; % normalized size of the font in equations
@@ -55,7 +56,7 @@ RBC = 2.5;
 PIP = 1;
 CON = 0.75;
 
-% variables related to tracking
+%% Variables related to tracking
 handles.pattern = [];       % pattern to be tracked over the video; an image
 handles.lastlistpat = [];   % the last pattern chosen for the list
 handles.patternlist = [];   % list of selected patterns
@@ -72,7 +73,7 @@ handles.pipmetricthresh = 0.95; % pipette tracking correlation threshold
 handles.contrasthresh = 0.95;   % contrast quality threshold
 handles.overLimit = false;      % indicates if currently calculated force is within linear approx. limit of not
 
-% variables related to video file
+%% Variables related to video file
 vidObj = [];        % video wrapper, to open videos (AVI,MP4,...) and TIFF alike
 handles.videopath = pwd;    % path to the video file
 handles.vidFrameNo = 0;     % number of the currently displayed frame
@@ -82,7 +83,7 @@ handles.disptrack = false;  % display track marks on the video
 handles.outframerate = 10;  % framerate of the output video
 handles.outsampling = 1;    % each n-th frame of original video is taken for output
 
-% experimental parameters
+%% Experimental parameters
 handles.pressure = 200;     % aspirating pressure of the pipette
 handles.RBCradius = RBC;    % radius of RBC
 handles.PIPradius = PIP;    % inner pipette radius
@@ -90,7 +91,7 @@ handles.CAradius = CON;     % radius of contact between streptabead and RBC
 handles.P2M = 0.1024;       % pixels to microns coefficient
 handles.stiffness = 200;    % RBC stiffness, in pN/micron
 
-% tracking data
+%% Tracking data structures
 intfields = { 'pattern', 'patcoor', 'beadcoor', 'patsubcoor', 'contrast','reference','frames' };
 colnames = {'Range|Start', 'Range|End', 'Bead|X-coor', 'Bead|Y-coor', 'Pipette|X-coor', 'Pipette|Y-coor', 'Anchor|X-coor', 'Anchor|Y-coor', 'Remove'};
 colformat = {'numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','numeric', 'numeric','logical'};
@@ -104,7 +105,7 @@ handles.remove = [];        % list of interval entries to remove from the comple
 handles.updpatframe = 0;    % pipette pattern originating frame, updated during addition process
 handles.calibint = [];      % single-frame interval in case a calibration frame needs to be set up
 
-% plotting and fitting settings
+%% Plotting and fitting settings structures
 handles.lowplot     = 1;    % lower bound of plotted data
 handles.highplot    = 10;   % upper bound of plotted data
 handles.toPlot      = 1;    % quantity to be plotted (1=contrast, 2=track (3D), 3=trajectories (2D), 4=force, 5=metrics)
@@ -120,7 +121,7 @@ handles.pulltxt   = [];     % ... and the like for pulling region
 handles.contype   = 1;      % type of contrast metric to display (1=SD2, 2=rSD2; see documentation)
 handles.calibrated= false;  % flags if the calculated force is calibrated (before force calculation if always false)
 
-% lists of UI handles for export/import; mutable handles
+%% Lists of UI handles for export/import; mutable handles
 GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
             'hpatternlist', 'hpatcoortxt', 'hbeadinilist', 'hbeadcoortxt',...
             'hcorrthreshtxt', 'hcontrasthreshtxt', 'hpipbuffer',...
@@ -148,7 +149,7 @@ GUIflags.Enables = {'hmoviebar', 'hplaybutton', 'hrewindbtn', 'hffwdbutton', ...
 GUIflags.Visibles = {'hpatterns', 'hbeadmethods', 'hpipdetection','hbeaddetection',...
             'hexpdata','hgetplatwidth','hgetplatthresh','hgetplatmin'};
         
-% list of GUI variables, mutables
+%% List of GUI variables, mutables
 GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ...
             'lastlistpat', 'patternlist', 'bead', 'lastlistbead', 'beadlist', ...
             'beadradius', 'beadbuffer', 'pipbuffer', 'beadsensitivity',...
@@ -162,7 +163,8 @@ GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ..
             'pushtxt', 'pulltxt', 'contype', 'calibrated' };
         
         
-% ================= SETTING UP GUI CONTROLS =========================
+%% ================= SETTING UP GUI CONTROLS =========================
+% contans parameters for the figure, movie axes, graphing axes and film bar
 handles.hfig = figure('Name', 'Pattern tracking','Units', 'normalized', 'OuterPosition', [0,0,1,1], ...
              'Visible', 'on', 'Selected', 'on','WindowScrollWheelFcn',{@mouseplay_callback});
 handles.haxes = axes('Parent',handles.hfig,'Units', 'normalized', 'Position', axesposition,...
@@ -175,7 +177,8 @@ handles.hmoviebar = uicontrol('Parent',handles.hfig, 'Style', 'slider', 'Max', 1
              'Callback', {@videoslider_callback});
 % =================================================================== 
 
-% ================= OPENNING A VIDEO FILE ===========================
+%% ================= OPENNING A VIDEO FILE ===========================
+% set panel to open, browse and input video path
 handles.hopenvideo = uibuttongroup('Parent', handles.hfig, 'Title','Open a video', 'Position', [0.05, 0.56, 0.25, 0.075]);
 handles.hvideopath = uicontrol('Parent',handles.hopenvideo, 'Style', 'edit', ...
             'Units', 'normalized',...
@@ -190,7 +193,9 @@ handles.hvideobrowse = uicontrol('Parent',handles.hopenvideo,'Style','pushbutton
 set([handles.hvideobutton,handles.hvideobrowse,handles.hvideopath],'FontUnits','normalized');         
 % ====================================================================    
 
-% ================= WORKING WITH THE VIDEO ===========================
+%% ================= WORKING WITH THE VIDEO ===========================
+% video control buttons like, Play, Stop, FFW, RWD, analyze contrast, go to
+% frame, generate film, sampling, output framerate etc.
 handles.husevideo   = uibuttongroup('Parent', handles.hfig, 'Title', 'Video commands', 'Units', 'normalized',...
              'Position', [0.31, 0.56, 0.24, 0.1]);
 handles.hplaybutton = uicontrol('Parent', handles.husevideo,'Style','pushbutton', ...
@@ -230,7 +235,9 @@ set([handles.hplaybutton,handles.hrewindbtn,handles.hffwdbutton,handles.hcontras
 set([handles.hdisptrack,handles.hframeratetxt,handles.hsamplingtxt,handles.hfrmrate,handles.hsampling], 'FontUnits','normalized');
 % ====================================================================
 
-% ================= PATTERN COLLECTION ===============================
+%% ================= PATTERN COLLECTION ===============================
+% set pipette tip pattern, create pattern list, add and remove from the
+% list, miniaxes to display a pattern, diplay pattern info
 handles.hpatterns = uibuttongroup('Parent', handles.hfig, 'Title', 'Pipette patterns', 'Units', 'normalized',...
             'Position', [0.56, 0.29, 0.1, 0.26],'Visible','off');
 handles.hpatternlist = uicontrol('Parent', handles.hpatterns, 'Style', 'popup', 'String', {'no data'}, 'Value', 1, ...
@@ -250,7 +257,9 @@ align(handles.hpatcoortxt,'Left','Middle');
 set([handles.haddpatternbtn,handles.hrmpatternbtn,handles.hrectbutton],'FontUnits','normalized');
 % ====================================================================
 
-% ================= BEAD DETECTION METHODS ===========================
+%% ================= BEAD DETECTION METHODS ===========================
+% set bead detection methods, create bead list, select ini. coordinate,
+% add and remove items from the list
 handles.hbeadmethods = uipanel('Parent', handles.hfig, 'Title', 'Bead tracking', 'Units', 'normalized',...
             'Position', [0.56, 0.05, 0.1, 0.24],'Visible','off');
 handles.hbeadinilist = uicontrol('Parent', handles.hbeadmethods, 'Style', 'popup', 'String', {'no data'},'Value',1,...
@@ -267,7 +276,9 @@ handles.hrmbeadbtn = uicontrol('Parent', handles.hbeadmethods, 'Style', 'pushbut
 set([handles.hpointbtn,handles.haddbeadbtn,handles.hrmbeadbtn], 'FontUnits','normalized');        
 % ====================================================================
 
-% ================= PIPETTE DETECTION SETTINGS =======================
+%% ================= PIPETTE DETECTION SETTINGS =======================
+% set pipette detection, correlation and contrast thresholds, failed frame
+% buffer
 handles.hpipdetection   = uibuttongroup('Parent', handles.hfig, 'Title', 'Pipette detection settings', 'Units', 'normalized',...
             'Position', [0.66, 0.29, 0.1, 0.26],'Visible','off');   
 handles.hcorrthreshtxt  = uicontrol('Parent',handles.hpipdetection, 'Style', 'text', 'String', {'Correlation'; strjoin({'thresh:', num2str(handles.pipmetricthresh)})},...
@@ -290,7 +301,9 @@ handles.hpipbuffer      = uicontrol('Parent',handles.hpipdetection', 'Style', 'e
 set([handles.hpipbufftxt,handles.hpipbuffer],'FontUnits','normalized');        
 % ====================================================================
 
-% ================= BEAD DETECTION SETTINGS ==========================
+%% ================= BEAD DETECTION SETTINGS ==========================
+% set pipette detection, radius range, edge and metric sensitivity, failed
+% frame buffer, metric threshold
 handles.hbeaddetection = uibuttongroup('Parent', handles.hfig, 'Title', 'Bead detection settings', 'Units', 'normalized',...
             'Position', [0.66, 0.05, 0.1, 0.24],'Visible','off');
 handles.hradtxt     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'pushbutton', 'String','<HTML><center>Radius range</HTML>',...
@@ -327,7 +340,11 @@ handles.hmetric     = uicontrol('Parent',handles.hbeaddetection,'Style','slider'
 set([handles.hradtxt,handles.hminrad,handles.hmaxrad,handles.hbuffertxt, handles.hbuffer,handles.hsensitivitytxt,handles.hgradtxt,handles.hmetrictxt,handles.hmetric],'FontUnits','normalized');         
 % ====================================================================
 
-% ==================== SELECTING INTERVALS TO TRACK ==================
+%% ==================== SELECTING INTERVALS TO TRACK ==================
+% major part of the UI, set the chain of intervals to track, input interval
+% of frames, initial bead position (from list or pick in frame), pipette
+% pattern (from list of pick in frame), show pattern, select anchor point
+% on the pattern, detect reference frame, add to interval
 handles.hintervals  = uitabgroup('Parent', handles.hfig, 'Units','normalized', 'Position', [0.05, 0.635, 0.25, 0.225]);
 handles.hsetinterval  = uitab('Parent', handles.hintervals, 'Title', 'Set interval', 'Units', 'normalized');
 handles.hintervaltxt= uicontrol('Parent',handles.hsetinterval, 'Style', 'text', 'String', 'Interval:', ...
@@ -393,14 +410,17 @@ set([handles.hintervaltxt, handles.hpatterntxt, handles.hpatanchortxt, handles.h
     handles.hendint,handles.hbeadint,handles.hpatternint,handles.hpatsubcoor], 'FontUnits','normalized','FontSize',0.3);
 % ====================================================================
 
-% ============== TABLE OF INTERVALS ==================================
+%% ============== TABLE OF INTERVALS ==================================
+% table showing selected intervals, allows to delete individual intervals
 handles.hlistinterval = uitab('Parent', handles.hintervals, 'Title', 'List of intervals', 'Units', 'normalized');
 handles.heraseint     = uicontrol('Parent',handles.hlistinterval,'Style','pushbutton', 'String', 'Erase', 'Units',...
                 'normalized', 'Position', [0.9,0.5,0.1,0.5], 'FontUnits','normalized', 'Enable', 'off',...
                 'Callback',{@eraseint_callback});
 % ====================================================================
 
-% ============== EXPERIMENTAL PARAMETERS =============================
+%% ============== EXPERIMENTAL PARAMETERS =============================
+% set, by input or measurement, radii (RBC, contact, pipette), pressute,
+% pixel to micron ratio 
 handles.hexpdata = uibuttongroup('Parent', handles.hfig, 'Title','Experimental parameters', 'Units','normalized',...
             'Position', [0.86,0.05,0.1,0.5],'Visible','off');
 handles.hprestxt    = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'String', 'Pressure:',...
@@ -427,7 +447,8 @@ set([handles.hRBCtxt,handles.hPIPtxt,handles.hCAtxt,handles.hP2Mtxt,handles.hpre
 set([handles.hpressure,handles.hRBCrad,handles.hPIPrad,handles.hCArad,handles.hP2M],'FontUnits','normalized');
 % ====================================================================
 
-% ================= VIDEO INFORMATION ================================
+%% ================= VIDEO INFORMATION ================================
+% only information about the video; read only fields
 handles.hvidinfo = uipanel('Parent', handles.hfig,'Title','Video information', 'Units','normalized',...
             'Position', [0.05, 0.86, 0.25, 0.1]);
 handles.hvidheight = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
@@ -448,7 +469,9 @@ set([handles.hvidheight,handles.hvidwidth,handles.hvidduration,handles.hvidframe
     handles.hvidname,handles.hvidformat],'FontUnits','normalized');        
 % ====================================================================
 
-% ================= RUNNING CALCULATION ==============================
+%% ================= RUNNING CALCULATION ==============================
+% set calculation, buttons to create BFPClass object, run tracking, get
+% force, plotting interface, select contrast,
 handles.hcalc =     uipanel('Parent', handles.hfig, 'Title', 'Tracking', 'Units', 'normalized',...
                 'Position', [0.76,0.05,0.1,0.5]);
 handles.hupdate      =   uicontrol('Parent', handles.hcalc, 'Style','pushbutton','String', 'Update', 'Units', 'normalized',...
@@ -495,7 +518,9 @@ set([handles.hupdate,handles.hruntrack,handles.hrunforce,handles.hgraphplot,...
     handles.hSD2, handles.hrSD2],'FontUnits','normalized');
 % ====================================================================
 
-% ========================= BASIC FITTING ============================
+%% ========================= BASIC FITTING ============================
+% set basic fitting, fit line, exponentiel, plateaux, set interval, set
+% plateaux detection parameters (plat width etc)
 handles.hfit        = uipanel('Parent',handles.hfig,'Title','Basic Fitting', 'Units','normalized',...
                 'Position', [0.45,0.66,0.1,0.30]);
 handles.hfitline    = uicontrol('Parent',handles.hfit,'Style','pushbutton','String','<HTML><center>Fit<br>line</HTML>',...
@@ -543,7 +568,8 @@ set([handles.hfitline,handles.hfitexp,handles.hfitplateau,handles.hgetplatwidth,
      handles.hgetplatthresh, handles.hplatthresh,handles.hgetplatmin,handles.hplatmin,handles.hfitint],'FontUnits','normalized');
 % ====================================================================            
 
-% ================= IMPORT,EXPORT,UI SETTINGS ============================
+%% ================= IMPORT,EXPORT,UI SETTINGS ============================
+% set IO setting, from-to fields, import-export buttons
 handles.hio      = uipanel('Parent',handles.hfig,'Title','Import, export, UI settings', 'Units','normalized',...
             'Position', [0.31,0.66,0.14,0.30]);
 handles.hvar     = uicontrol('Parent', handles.hio, 'Style', 'popupmenu', 'Units', 'normalized', 'String',...
@@ -572,7 +598,7 @@ handles.hhidedet = uicontrol('Parent',handles.hio,'Style','togglebutton','Min',0
 %            'Callback', {@BDtest_callback});
 set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,handles.hhideexp,handles.hhidelist,handles.hhidedet],'FontUnits','normalized');
         
-% ============ LOAD OLDER SESSION PASSED AS ARGUMENT =================
+%% ============ LOAD OLDER SESSION PASSED AS ARGUMENT =================
     % if the data exist, load the saved environment
     % it is only called here, after the GUI is constructed
     if loadData; 
@@ -581,8 +607,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 % ====================================================================
 
 
-% ================= CALLBACK FUNCTIONS ===============================
-
+%% ================= CALLBACK FUNCTIONS ===============================
+%% Move mouse wheel to advance/rewind the video frame
     % mouse wheel action to advance or roll back the video frames
     function mouseplay_callback(~,data)
         if isempty(vidObj); return; end;    % without video, do nothing 
@@ -597,7 +623,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
-
+%% Hide GUI panel
     % allows to hide a panel of functions (particularly for experimental
     % data panel, tracking lists panel and tracking parameters panel
     function hidepanel_callback(source,~,name,hpanel)
@@ -616,6 +642,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %        source.String = backdoorObj.getTest();
 %    end
 
+%% Import function
     % allows various import possibilities
     function import_callback(~,~)
         var = handles.hvar.Value;       % which variable is to be imported; 1=force & track, 2=frame, 3=graph, 4=parameters
@@ -709,6 +736,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Export function
     % allows various combinations of figure elements and targets of export
     function export_callback(~,~)
         var = handles.hvar.Value;       % which variable is to be exported; 1=force & track, 2=frame, 3=graph, 4=parameters
@@ -874,7 +902,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             
         end
     end
-    
+
+%% I/O settings for various in/out target combinations
     % choosing various combinations has various effects
     function port_callback(~,~)
         var = handles.hvar.Value;
@@ -948,18 +977,21 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 end
         end        
     end
-       
+
+%% Set verbose or more silent input
     % sets the 'handles.verbose' flag
     function verbose_callback(source,~)
         handles.verbose = logical(source.Value);
     end
 
+%% Change UI control (mostly button) for input (edit field)
     % changes UI to allow user input
     function platswitch_callback(source,~,setter)
         source.Visible = 'off';
         setter.Visible = 'on';
     end
 
+%% Read input value (edit field) and set variable
     % reads and sets the value
     function getplat_callback(source,~,var)
         val = str2double(source.String);
@@ -995,6 +1027,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
     
+%% Fitting function
     % fitting the graph; only one type of fitting line at the time
     function fit_callback(~,~,type,limit)
         
@@ -1224,6 +1257,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Fitting interval selection
+    % this is a bit tricky with preserving correct settings for hit test,
+    % video frame-graph click connection, no freeze etc
     % select interval for fitting; make sure to catch exceptions
     function fitint_callback(~,~)
         if handles.selecting;       % there is a strange interplay between uiwait/waitfor functions ...
@@ -1273,6 +1309,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 
     end
 
+%% Support function for fitting interval setting
     % callback called when impoint gets new position
     function fitintNewPosition_callback(coor,var)
         nvar = mod(var,2)+1;
@@ -1299,6 +1336,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                 num2str(round(hline(2).cx)),']</HTML>');
     end
 
+%% Returns position of the cursor click
     % return coordinates of cursor on the graph; delcall is only deleting
     % the marking in the graph
     function getcursor_callback(source,~,delcall)
@@ -1338,17 +1376,20 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hgraph.ButtonDownFcn = {@getcursor_callback}; 
     end
 
+%% Call to generate tracking fidelity report
     % displays report of the last tracking, illustrating poorly trackable
     % intervals, showing metrics as an overlay
     function getreport_callback(~,~)
         BFPobj.generateReport();
     end
 
+%% Select item to plot
     % selection of plotted quantity from drop-down menu
     function graphpopup_callback(source,~)
         handles.toPlot = source.Value;
     end
        
+%% Set range of plot
     % set the range for plot
     function plotrange_callback(source,~,oldval,var)
        handles.lowplot = round(str2double(handles.hlowplot.String));            % save the values
@@ -1366,6 +1407,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
        end;
     end
 
+%% Plotting control function
     % plot selected quantity (numbered 1-5)
     function graphplot_callback(~,~)
         camup(handles.hgraph,'auto');
@@ -1418,6 +1460,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};
     end    
 
+%% Generate LaTeX annotation with stiffness intformation in a new window
     % displays information about stiffness in a new window
     function stiffinfo_callback(~,~)
         boxoptions.Interpreter = 'latex';
@@ -1427,6 +1470,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             'Stiffness info', boxoptions);
     end
 
+%% Display info about linear equation for RBC stiffness validity
     % displays information about reliability of the linear approximation of
     % force-extension relation
     function lininfo_callback(~,~)
@@ -1444,6 +1488,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Call to start force calculation
     % gets parameters for calculation, calculates (&shows) 'k', gets force
     function runforce_callback(~,~)
         % if verbose and geometric parameters were not changed, warn
@@ -1482,6 +1527,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};
     end
 
+%% Call to start bead and pipette tracking accross pre-selected intervals
     % runs tracking procedure
     function runtrack_callback(~,~)
         BFPobj.Track(handles.hgraph);       % run tracking
@@ -1498,6 +1544,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hgraphitem.Value = handles.thisPlot;
     end
 
+%% Update BFPClass object containing tracking and force settings
     % procedure to create BFPClass object, which performs all the
     % calculations
     function update_callback(~,~)
@@ -1507,7 +1554,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         set([handles.hruntrack,handles.hgenfilm],'Enable','on');        
     end
 
+%% Add an interval to the set of tracking intervals
     % adds currently defined interval to the list of intervals
+    % runs mady integrity checks, communicates issues to the user, performs
+    % corrections and even runs small functions to get user input
     function addinterval_callback(~,~)
         
         % make input interval copy, to track corrective changes
@@ -1835,6 +1885,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     
     end
 
+%% Marks an interval in the interval list for removal
     % selects table lines (intervals from intervallist) to be removed
     function rmtabledint_callback(hT, data)
         row = data.Indices(1);
@@ -1853,6 +1904,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
+%% Call to erase selected intervals from the list
     % removes all selected entries from the interval list and the table
     function eraseint_callback(~,~)
         if numel(handles.remove) > 0;
@@ -1913,7 +1965,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         beadpoint.delete;   % delete the impoint object
         if isgraphics(hpatfig); close(hpatfig); end;     % close the figure (if not closed)
     end
-        
+
+%% Set the video frame to the first fram of the interval
     % set current frame to the first frame of the interval
     function gotointframe_callback(~,~)
         if isempty(handles.interval) || ~isfield(handles.interval,'frames') ||...
@@ -1926,6 +1979,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Get the selected bead in the list as the bead for current interval
     % saves the currently open bead for this interval to track
     function getintbead_callback(~,~)
         % check if there is a bead in the list to add
@@ -1961,7 +2015,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hselectpat.Enable = 'on';
     end
 
-
+%% Get selected pipette pattern from the list for the current interval
     % saves the currently open pattern for this interval to track
     function getintpat_callback(~,~)
         % check if there's a pattern in the list to add

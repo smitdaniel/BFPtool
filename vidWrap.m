@@ -1,55 +1,66 @@
-%   This class is just a small wrapper to allow for using the same
-%   getters and setters for video objects working with Tiff format
-%   (libTiff) and other video formats (videoReader)
-%   IN:
-%   videopath   : constructor takes the full path to the videofile
-%   DETAIL :
+%% This class is just a small wrapper for video files
+%   It allows to use the same access funtion for video objects working 
+%   with Tiff format (libTiff) and other video formats (videoReader)
+%   *IN (constructor):*
+%   * videopath   : constructor takes the full path to the videofile
+%   
+%   *DETAIL:*
 %   The wrapper determines the type of the file, and populates the
 %   information about the video in the 'Video information' panel in the
-%   BFPGUI. It provides (and calculates) frame-by-frame contrast on demand.
+%   BFPGUI. It provides (and calculates) frame-by-frame contrast on demand,
+%   both SD2 and rSD2, if prompts the user to input framerate for the TIFF
+%   videos, and verifies compatibility of video files during session import
+%   (even if file name is different).
 %   ================================================================
 
 classdef vidWrap < handle
 
+    %% calss properties; containing information about the video
     properties
         
         videopath;  % gives path to the videofile
         istiff;     % determines the type of the video connected to the object
         vidObj;     % video object
         
-        Name     = [];
-        Format   = [];
-        Width    = 0;
-        Height   = 0;
-        Duration = 0;
-        Framerate = 0;
-        Frames   = 0;       % number of frames in the video
+        Name     = [];  % filename
+        Format   = [];  % video file format
+        Width    = 0;   % width of frame in pix
+        Height   = 0;   % height of frame in pix
+        Duration = 0;   % length in seconds
+        Framerate = 0;  % frames per second
+        Frames   = 0;   % number of frames in the video
 
-        CurrentFrame = 0;
+        CurrentFrame = 0;   % currently open frame
         
         % supplementary data
-        Contrast = [];  % contrast as standard deviation SD2
+        Contrast = [];  % contrast as 2D standard deviation of frame SD2
         GrayLvl = [];   % contrast as a mean intensity level
-        LocContrast = [];   % local contrast; rolling variance of SD2
+        LocContrast = [];   % local contrast; rolling variance of SD2 cont.
         
         % contrast calculation parameters
-        rollVarWidth = 40;  % width of rolling variance of contrast
+        rollVarWidth = 40;  % width of rolling variance of contrast (in frames)
         
     end
 
+    %% class methods
+    % TODO: implement a method to let users change framerate later
     methods
        
-        % constructor, builds the video reader object and wraps it
+        %% constructor, builds appropriate video reader object and wraps it
         function obj = vidWrap( videopath )
             
+            % verify the file exists; %TODO: replace error with an
+            % informative return information
             if exist(videopath, 'file');
                 obj.videopath = videopath;
             else
                 error(strcat(videopath,' is not a valid path'));
             end
 
+            % analyze file name
             [~, name, ext ] = fileparts(videopath);
             
+            % check if the file if TIFF
             if strcmp(ext,'.tif') || strcmp(ext,'.tiff');
                 obj.istiff = true;
                 obj.vidObj = Tiff(obj.videopath,'r');   % open tiff file for reading;
@@ -63,11 +74,11 @@ classdef vidWrap < handle
                 obj.vidObj.setDirectory(1);
                 obj.CurrentFrame = 1;
                 
-                % default values for now
+                % default values for now; will be modified by user
                 obj.Duration  = obj.Frames;
                 obj.Framerate = 1;
                 
-            else
+            else    % if file is not TIFF
                 obj.istiff = false;
                 obj.vidObj = VideoReader(obj.videopath);
                 
@@ -83,6 +94,7 @@ classdef vidWrap < handle
             end
         end
         
+        %% Frame reader
         % reads and returns next available frame in the video;
         % if index is provided, returns the frame of the given index
         function [frame] = readFrame(obj,varargin)
@@ -99,6 +111,7 @@ classdef vidWrap < handle
             
             frame = struct( 'cdata', zeros(obj.Height, obj.Width, 'uint16'), 'colormap', []);
             
+            % separate reading method for tiff and non-tiff
             if obj.istiff
                 if index ~= 0;
                     obj.vidObj.setDirectory(index);
@@ -123,19 +136,20 @@ classdef vidWrap < handle
             end
         end
         
+        %% Contrast calculating method
         % Procedure verifies, if the contrast exists for all frames of video,
-        % and if is unbroken (i.e. nonzero) in the requested interval.
-        % IN: ffrm-lfrm = first frame to last frame requested
-        %     type = return (in var 'contrast') local contrast variance or
-        %     SD2 value for each frame
-        %     rVarWW = window width for local contrast variance; if this
-        %     changes, the rSD2 is recalculated on the function call
-        % OUT: contrast = metric (1=SD2, 2=rSD2)
-        %      meanGray = mean grayscale value of frames
-        % Recalculates all frames if conditions are not met and returns
+        % and whether is unbroken (i.e. nonzero) in the requested interval.
+        % IN: ffrm-lfrm : first frame to last frame requested
+        %     type      : return (in var 'contrast') local contrast variance or
+        %                 SD2 value for each frame
+        %     rVarWW    : window width for local contrast variance; if this
+        %               changes, the rSD2 is recalculated on the function call
+        % OUT: contrast : metric (1=SD2, 2=rSD2)
+        %      meanGray : mean grayscale value of frames
+        % DETAIL: Recalculates all frames if conditions are not met and returns
         % the FULL array 'contrast', not just the requested subinterval.
         % Returned array is truncated ONLY if the process is cancelled by
-        % the user.
+        % the user. This could be improved.
         function [ contrast, meanGray ] = getContrast(obj, ffrm, lfrm, varargin)
             
             persistent inp;
@@ -148,17 +162,17 @@ classdef vidWrap < handle
                 inp.addRequired('obj');
                 inp.addRequired('ffrm');    % initial requested frm
                 inp.addRequired('lfrm');    % final requested frm
-                inp.addOptional('type', defaultType, @isfloat);       % type of contrast metric
-                inp.addOptional('rVarWW', defaultrVarWW, @isfloat);   % width of the rSD2 window
+                inp.addOptional('type', defaultType, @(x) (isfloat(x) && (x==1||x==2)) );       % type of contrast metric; 1 or 2
+                inp.addOptional('rVarWW', defaultrVarWW, @(x) (isfloat(x) && x>0) );   % (positive) width of the rSD2 window
             end
                 
             inp.parse(obj, ffrm, lfrm ,varargin{:});
 
             obj = inp.Results.obj;
-            ffrm = inp.Results.ffrm;
-            lfrm = inp.Results.lfrm;
+            ffrm = round(inp.Results.ffrm);
+            lfrm = round(inp.Results.lfrm);
             type = inp.Results.type;
-            rVarWW = inp.Results.rVarWW;
+            rVarWW = round(inp.Results.rVarWW);
             % ===========================================================
             
             if obj.rollVarWidth ~= rVarWW   % update rolling variance window width if needed
@@ -171,29 +185,44 @@ classdef vidWrap < handle
             % redo analysis, if it wastn't, return current values otherwise
             % (this is usually for plotting function call)
             if (isempty(obj.Contrast) || numel(obj.Contrast) < obj.Frames || ...
-               any(find(obj.Contrast(ffrm:lfrm)==0))) % the last option suggests failed previos run (i.e. contrast should never be zero)                
+               any(find(obj.Contrast(ffrm:lfrm)==0))) % the last option suggests failed previos run (i.e. contrast should never be zero; only for empty frame)                
                 oldFrame = obj.CurrentFrame;
+                % generate customized message for contrast calculation
+                if isempty(obj.Contrast);
+                    str= 'No previous contrast calculation data were found.';
+                elseif numel(obj.Contrast) < obj.Frames
+                    str= ['Previous contrast calculation data are corrupt.',...
+                        'The data do not cover the full length of the video.',...
+                        'The previous calculation was probably cancelled.'];
+                elseif any(find(obj.Contrast(ffrm:lfrm)==0))
+                    badnum = numel(find(obj.Contrast(ffrm:lfrm)==0));
+                    str= ['Contrast calculation data of the requested interval are corrupt.',' ',...
+                        num2str(badnum), ' ', 'frames have standard deviation SD2=0.',...
+                        'Frames might be possibly empty or damaged.'];
+                end
                 obj.Contrast = zeros(obj.Frames,1,'double');
                 obj.GrayLvl  = zeros(obj.Frames,1,'double');
-                warning(strjoin({'Contrast for the requested interval',strcat('[',...
-                    num2str(ffrm),':', num2str(lfrm),']'),'was either not calculated before, not',...
-                    'finished, or the results are malformed. Contrast will be recalculated',...
-                    'for the whole video.'}));
+                warning(strjoin({'Contrast will be calculated for the full video.',...
+                    'Contrast data were initially requested for the interval',strcat('[',num2str(ffrm),':', num2str(lfrm),']'),...
+                    str}));
 
                 disp('Calculating the contrast for each frame of the film.');
                 
+                % calculation loop + progress bar
                 wbmsg = strjoin({'Calculating contrast of video of', num2str(obj.Frames),'frames'});
                 hwaitbar = waitbar(0,wbmsg,'Name','Contrast calculation', 'CreateCancelBtn', ...
                     {@cancelwb_callback});
                 killwb = false;
                 for frm=1:obj.Frames;
-                    if killwb; break; end;
-                    waitbar(frm/obj.Frames,hwaitbar);
+                    if killwb; break; end;                    
                     thisFrame = obj.readFrame(frm);
                     doubleFrame = double(thisFrame.cdata);
                     obj.Contrast(frm) = std2(doubleFrame);
                     obj.GrayLvl(frm) = mean2(doubleFrame);
-                    if(mod(frm,100)==0); disp(strcat('Frames processed:', num2str(frm),'/',num2str(obj.Frames))); end;
+                    if(mod(frm,100)==0); 
+                        disp(strcat('Frames processed:', num2str(frm),'/',num2str(obj.Frames))); 
+                        waitbar(frm/obj.Frames,hwaitbar);
+                    end;
                 end
 
                 % normalize; values for contrast and mean-gray are only
@@ -222,7 +251,7 @@ classdef vidWrap < handle
                     warning('The values of local (rolling) contrast are suspicions (max=0). Please double check your video.');
                 end
                 obj.readFrame(oldFrame);    % reset the original image
-            elseif redorSD  % recalculate local contrast SD, if window width was changed
+            elseif redorSD      % recalculate local contrast SD, if window width was changed
                 obj.getLocalContrast();
                 maxLocContrast = max(obj.LocContrast);
                 if maxLocContrast ~= 0
@@ -240,7 +269,7 @@ classdef vidWrap < handle
             end;
             
             meanGray = obj.GrayLvl;
-            if exist('hwaitbar','var');delete(hwaitbar); end;
+            if exist('hwaitbar','var'); delete(hwaitbar); end;
 
             % cancel function for the contrast-calculation wait bar
             function cancelwb_callback(~,~)
@@ -254,6 +283,7 @@ classdef vidWrap < handle
             
         end
         
+        %% Method that calculates local contrast from SD2 contrast data
         % calculate rolling variance of the constrast measure SD2
         % TODO: this method should be private, as it uses data first
         % calculated by the getContrast method
@@ -277,6 +307,7 @@ classdef vidWrap < handle
            
         end
         
+        %% Returns contrast for the requested frame
         % return value of contrast at particular frame
         function [contrastfrm] = getContrastByFrame(obj,frm,type)
             if isempty(obj.Contrast); obj.getContrast; end;     % if contrast no calculated yet
@@ -287,12 +318,13 @@ classdef vidWrap < handle
             end
         end
             
-        
+        %% Convert the frame to gray scale
         % verify and convert to gray; 
         function [cdata] = setGray(~,cdata)
             if (size(cdata,3) ~= 1); cdata = rgb2gray(cdata); end
         end
         
+        %% Set the frame rate of the TIFF video
         % querry user to provide a framerate for TIFF file
         function db = getFramerate(obj)
             inputype = 1;
@@ -384,6 +416,7 @@ classdef vidWrap < handle
             
         end
         
+        %% Verify the object video and video of another object match
         % compare the properties of videos, to see if they are the same
         function match = matchVideos(obj, vidObjToMatch)
             match = struct('format',false,'width',false,'height',false,...

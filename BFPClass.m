@@ -1,14 +1,31 @@
-    %BFP Holds data and methods for BFP experiment analysis
-    %   This class saves settings and results of the analysis of BFP
-    %   experiments. It contains methods to operate in discontiguous
-    %   interval landscape, sub-call TrackBead and TrackPipette methods
-    %   with appropriate settings, generate graphs (taking a handle) of
-    %   data, calculate stiffness and corresponding time evolution of
-    %   force, import data and generate fidelity report
-    %   ===============================================================
+%% BFP Holds data and methods for BFP experiment analysis
+%   This class saves settings and results of the analysis of BFP
+%   experiments. It contains methods to operate in discontiguous
+%   interval landscape, sub-call TrackBead and TrackPipette methods
+%   with appropriate settings, generate graphs (taking a handle) of
+%   data, calculate RBC stiffness and corresponding time evolution of
+%   force, import data and generate fidelity report.
+%   *IN:* in the particular order
+%   * name      : the name of the video
+%   * vidObj    : object wrapping the video file
+%   * intlist   : list of intervals to track as set up in the GUI
+%   * default constructor exists, takes no input arguments
+%
+%   *DETAIL:*
+%   Class contains default constructor and constructor taking 3 inputs.
+%   Three methods to import parameters from the GUI, experimental
+%   parameters (like geometry of the probe etc.), pipette and bead tracking
+%   settings (like thresholds, sensitivity etc.). Then the tracking method
+%   itself, plotting method (which takes handle to the axes, to which it
+%   should plot), method to calculate force, to generate tracking fidelity
+%   report, to import data in orderly manner, to generate tracking film (as
+%   an illustration of tracking), calculate stiffness and return values of
+%   data by frame (per frame request).
+%   ===============================================================
 
 classdef BFPClass < handle
     
+    %% class properties; containing information about the tracking
     properties
         
         % computational variables
@@ -26,7 +43,7 @@ classdef BFPClass < handle
         % list of intervals in the video to track; contains all the
         % necessary information: the patterns to track, time intervals,
         % initial points of search, anchor on the pattern, zero force
-        % point
+        % point (i.e. reference distance frame)
         intervallist;
         
         % experimental parameters
@@ -39,16 +56,16 @@ classdef BFPClass < handle
         Dk; % stiffness error
         
         % bead tracking settings
-        radius;
-        buffer;
-        sensitivity;
-        edge;
-        metric;
+        radius;         % range of radii to track the bead in
+        buffer;         % max. frames of failed detection in a row
+        sensitivity;    % bead sensitivity (thresh for accum. array)
+        edge;           % edge detection thresh
+        metric;         % bead detection metric thresh (based on accum array)
         
         % pipette tracking settings
-        correlation;
-        contrast;
-        pipbuffer;
+        correlation;    % correlation coefficient threshold
+        contrast;       % contrast threshold
+        pipbuffer;      % max. frames of failed matching in a row
         
         % errors of measurement (should be editable)
         DP = 10;    % implicit error of pressure measurement, 10 Pa
@@ -63,8 +80,11 @@ classdef BFPClass < handle
        reportfontsize = 0.04;   % font size for a report pop-up window 
     end
     
+    %% Class methods
     methods
-        % constructor
+        
+        %% Constructor
+        % constructor (default + with 3 inputs)
         function obj = BFPClass(varargin)   % in order: name, vidObj, intlist
             
             if nargin == 0  % default constructor
@@ -73,25 +93,25 @@ classdef BFPClass < handle
                 obj.trackedFrames = 0;    
                 obj.toBeTracked = 0;
             else
-                intlist = varargin{3};
+                intlist = varargin{3};              % the third input
             
                 obj.trackedFrames = 0;
                 obj.toBeTracked = 0;
                 obj.name = varargin{1};             % set calc obj name
                 obj.vidObj = varargin{2};           % set video object handle (access the video)
-                obj.maxFrame = 1;
-                obj.minFrame = obj.vidObj.Frames;   % number of frames in the video
-                fields = fieldnames(intlist(1));
-                inters = numel(intlist);
+                obj.maxFrame = 1;                   % maximal frame (last tracked frame); these values will be set up later...
+                obj.minFrame = obj.vidObj.Frames;   % ...; minimal frame (first tracked frame)
+                fields = fieldnames(intlist(1));    % fields defined in GUI
+                inters = numel(intlist);            % number of discontiguous intervals
                 obj.tracked(1:inters) = false;      % no tracking done when object is created
                 for int=1:inters                    % copy the list of intervals in the video to analyze
                     for nam=1:numel(fields)
                        obj.intervallist(int).(fields{nam}) = intlist(int).(fields{nam});
                     end
                     if (obj.intervallist(int).frames(1)~=obj.intervallist(int).frames(2))   % ignore one frame intervals
-                        obj.minFrame = min(obj.intervallist(int).frames(1), obj.minFrame);
+                        obj.minFrame = min(obj.intervallist(int).frames(1), obj.minFrame);  % set the first frame
                     end
-                    obj.maxFrame = max(obj.intervallist(int).frames(2), obj.maxFrame);
+                    obj.maxFrame = max(obj.intervallist(int).frames(2), obj.maxFrame);      % set the last frame
                     obj.toBeTracked = obj.toBeTracked + 1 + ...     % calculate the number of frames in list to process
                                       obj.intervallist(int).frames(2) - obj.intervallist(int).frames(1);
                 end
@@ -99,7 +119,8 @@ classdef BFPClass < handle
             end
         end
         
-        % set up experimental parameters;
+        %% Parameters set -- read from GUI
+        % set up experimental parameters; read from GUI
         function getParameters(obj,Rg,Rc,Rp,P)
             obj.Rg = Rg;
             obj.Rc = Rc;
@@ -108,7 +129,7 @@ classdef BFPClass < handle
             obj.getStiffness(); % calculate the RBC stiffness (w/ uncert.)
         end
         
-        % set up settings for bead tracking
+        % set up settings for bead tracking; read from GUI
         function getBeadParameters(obj,radius,buffer,sensitivity,edge,metric,P2M)
             obj.radius = radius;
             obj.buffer = buffer;
@@ -118,16 +139,21 @@ classdef BFPClass < handle
             obj.P2M = P2M;
         end
         
-        % set up settings for pipette tracking
+        % set up settings for pipette tracking; read from GUI
         function getPipParameters(obj,correlation,contrast,buffer)
             obj.correlation = correlation;
             obj.contrast    = contrast;
             obj.pipbuffer   = buffer;
         end
         
-        % triggers tracking procedures; takes axes handle to plot results
+        %% Tracking function
+        % triggers tracking procedures; takes axes handle (hplot) to plot results
         function Track(obj, hplot)
             
+            % set up tracking progress bar; besides showing progress, the
+            % bar object contains also user data important for
+            % user-cancelled condition, tracking failure orderly exit and
+            % tracked frames counter
             htrackbar = waitbar(0,'Tracking is about to start','Name','Tracking', 'CreateCancelBtn', ...
                     {@canceltb_callback},'Units','characters','OuterPosition',[110,40,52,14],...
                     'Resize','on','Visible','on');  % create waitbar figure and pass it on tracking methods
@@ -137,25 +163,32 @@ classdef BFPClass < handle
             htrackbar.UserData.toBeTracked = 2*obj.toBeTracked;   % total number of frames to be tracked x 2 (pipette+bead)
             htrackbar.UserData.wereTracked = 0;     % store number of tracked frames
             cla(hplot,'reset');
+            % cycle through intervals
             for int = 1:numel(obj.intervallist)
                 
+                % break if cancelled by user by clicking 'cancel' button on
+                % the progress bar (created previously)
                 if htrackbar.UserData.killTrack; 
                     obj.tracked(int:end) = false;   % set all following intervals to non-tracked
                     break;                          % break the tracking if user-cancelled
                 end;   
                 
+                % construct the progress bar
                 htrackbar.UserData.intmsg = strjoin({'Tracking interval',num2str(int),'of',num2str(numel(obj.intervallist))});
                 waitbar(0,htrackbar,htrackbar.UserData.intmsg);
                 
+                % track the pipette
                 [obj.pipPositions(int).coor, obj.pipPositions(int).metric, obj.pipPositions(int).bads] = ...
                                             TrackPipette( obj.vidObj, obj.intervallist(int).pattern,...
                                             obj.intervallist(int).patcoor,obj.intervallist(int).frames,...
                                             'robustness',obj.correlation, 'quality', obj.contrast,...
                                             'buffer', obj.pipbuffer, 'waitbar', htrackbar);
-                if htrackbar.UserData.failure; 
+                if htrackbar.UserData.failure;  % orderly skipping of the interval in case of failure
                     failcontinue(int,true); 
                     continue;
                 end;
+                
+                % track the bead
                 [obj.beadPositions(int).coor,obj.beadPositions(int).rad,obj.beadPositions(int).metric,...
                                             obj.beadPositions(int).bads]  = ...
                                             TrackBead( obj.vidObj, obj.intervallist(int).contrast,...
@@ -163,7 +196,7 @@ classdef BFPClass < handle
                                             'radius', obj.radius, 'buffer', obj.buffer, 'sensitivity', obj.sensitivity,...
                                             'edge', obj.edge, 'robustness', obj.metric, 'quality', obj.contrast,...
                                             'waitbar', htrackbar);
-                if htrackbar.UserData.failure; 
+                if htrackbar.UserData.failure;  % orederly skipping the interval in case of failure
                     failcontinue(int,false); 
                     continue;
                 end;
@@ -174,8 +207,6 @@ classdef BFPClass < handle
                 obj.pipPositions(int).coor    = obj.px2um(obj.pipPositions(int).coor);
                 obj.beadPositions(int).coor   = obj.px2um(obj.beadPositions(int).coor);
                 obj.beadPositions(int).rad    = obj.px2um(obj.beadPositions(int).rad);
-                %obj.beadPositions(int).metric = obj.beadPositions(int).metric/(max(obj.beadPositions(int).metric));
-                
                 
                 % modify number of tracked frames
                 obj.trackedFrames = obj.trackedFrames + ...
@@ -189,26 +220,28 @@ classdef BFPClass < handle
                 end;
             end
             
-            delete(htrackbar);
+            delete(htrackbar);  % remove progress bar
             
-            % if at least one object was tracked
+            % if at least one interval was tracked
             if any(obj.tracked);
-                obj.generateReport(); 
-                obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');          % plot the tracking data
+                obj.generateReport();   % generate tracking fidelity report
+                obj.plotTracks(hplot,obj.minFrame,obj.maxFrame,true,true,'Style','2D');     % plot the tracking data
             end;
             
-            % callback to kill tracking by pressing cancel on wb
+            % callback to kill tracking by pressing cancel on WB (nested)
             function canceltb_callback(~,~)
                 htrackbar.UserData.killTrack = true;
             end
             
-            % reset flags and do updates after failed interval
+            % reset flags and do updates after failed interval; this allows
+            % an orderly continuation of tracking if one of the intervals
+            % fails; the function dumps the data into the base workspace
             function failcontinue(inum,pipette)
                 str = ['_time_',datestr(datetime('now'),'HHMM')]; % get current time (to label dumped logs)
                 warning(['The imterim data of failed interval (', num2str(inum), ') will be dumped into',...
                     ' the base Matlab workspace after the tracking finishes.']);
-                obj.tracked(inum) = false;
-                htrackbar.UserData.killTrack = false;   % restore not-user-cancelled
+                obj.tracked(inum) = false;              % failed interval marked as not tracked
+                htrackbar.UserData.killTrack = false;   % restore not-user-cancelled to continue tracking
                 htrackbar.UserData.failure = false;     % remove failflag
                 obj.trackedFrames = obj.trackedFrames + ...
                 (obj.intervallist(inum).frames(2)-obj.intervallist(inum).frames(1)+1);  % mark frames as processed
@@ -231,12 +264,19 @@ classdef BFPClass < handle
             
         end
         
-        
+        %% Plotting function
         % plots detected tracks; in 3D, the z-dimension is the time axis
+        % plots also force, 2D track projection and metrics
+        % TODO: at the current implementation, the failed intervals are
+        % excluded as a whole. This may change in future (would be better
+        % to use as much data as possible). This method already tries to
+        % determine, what is really the last processed fram of an interval
+        % (supposing it might have failed half-way through the interval
+        % processing). This function should be finished.
         function [] = plotTracks(obj, hplot, varargin )
             
             persistent inp;
-            styleList = {'2D','3D','F','M'};    % trajectory, track, force, metric
+            styleList = {'2D','3D','F','M'};    % trajectory, track, force, metric; list of possible plots
             
             if isempty(inp)
                 inp = inputParser();
@@ -266,6 +306,7 @@ classdef BFPClass < handle
             calib = inp.Results.Calibration;
             % ===========================            
             
+            % axis on the right labelled 'Deformation' for force plot
             persistent ax2;
             if ~isempty(ax2); ax2.delete; end
             
@@ -293,10 +334,11 @@ classdef BFPClass < handle
             cla(hplot,'reset');
             set(hplot,'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
             
+            % cycle through all the intervals
             for int=1:numel(obj.intervallist)
                 if ~obj.tracked(int); continue; end;    % skip non-tracked intervals
                 hold(hplot,'on');
-                if obj.intervallist(int).frames(1) > lInd || obj.intervallist(int).frames(2) < fInd; continue; end;
+                if obj.intervallist(int).frames(1) > lInd || obj.intervallist(int).frames(2) < fInd; continue; end; % skip intervals outside of the plotted window
                 
                 ffrm = max(fInd,obj.intervallist(int).frames(1));
                 lfrm  = min(lInd,obj.intervallist(int).frames(2));      % # of requested last frame
@@ -312,7 +354,7 @@ classdef BFPClass < handle
                     lh = legend(hplot,'force');
                     th = title(hplot, 'Force [pN]','Color','green', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     xlabel(hplot, 'time [frames]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
-                    if calib
+                    if calib    % check if probe geometry was measured and so the probe has been calibrated or not
                         ylabel(hplot, 'Force [pN]', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
                     else
                         ylabel(hplot, 'uncalibrated force', 'FontUnits','normalized','FontSize',BFPClass.labelfontsize);
@@ -380,6 +422,7 @@ classdef BFPClass < handle
                 hplot.XLim=[fInd,lInd];
             end
             
+            % add the right y-axis with 'Deformation' label
             if strcmp(style,'F')
                 hp = hplot.Position;
                 hf = hplot.Parent;
@@ -399,7 +442,8 @@ classdef BFPClass < handle
             
         end
         
-        % generates a movie of tracking
+        %% Movie generating function
+        % generates a movie of tracking; with the tracking marks overlay
         function [] = generateTracks( obj, varargin )
            
             if ~obj.tracked;
@@ -440,18 +484,18 @@ classdef BFPClass < handle
             Sampling    = inp.Results.Sampling;
             % ==================================
             
-            piprad = 5;     % pipette radius 
+            piprad = 5;     % pipette mark radius 
             totCount = 0;   % total counter of all generated frames
             vidWriteObj = VideoWriter(VideoPath,Profile);  % set up writer object
             vidWriteObj.FrameRate = Framerate;
             vidWriteObj.Quality = 100;          % maximal quality
-            open(vidWriteObj);                  % open the file
-            hhide = figure('Visible','off');        % start an invisible figure
+            open(vidWriteObj);                  % open the target file
+            hhide = figure('Visible','off');    % start an invisible figure
             haxes = axes('Parent',hhide);
             
-            % parse all analyzed frames in intervals
+            % parse all analyzed intervals
             for int=1:numel(obj.intervallist)
-                if ~obj.tracked(int); continue; end;    % skip non-tracked
+                if ~obj.tracked(int); continue; end;    % skip non-tracked intervals
                 count = 1;    
                 for frm=obj.intervallist(int).frames(1):Sampling:obj.intervallist(int).frames(2)
                     frame = obj.vidObj.readFrame(frm);      % read new frame
@@ -463,24 +507,25 @@ classdef BFPClass < handle
                     beadCentre = um2px([obj.beadPositions(int).coor(count,2), obj.beadPositions(int).coor(count,1)]); % Matlab coordinate system for displaying (testing)
                     pipCentre  = um2px([obj.pipPositions(int).coor(count,2), obj.pipPositions(int).coor(count,1)]);
                     rad = um2px(obj.beadPositions.rad(count));
-                    viscircles(beadCentre,rad, 'EdgeColor','red');
-                    viscircles(pipCentre,piprad,'EdgeColor','blue');                    
-                    text(20,20,strcat('Frame: ', num2str(count),'/',num2str(obj.trackedFrames)));
+                    viscircles(beadCentre,rad, 'EdgeColor','red');      % draw bead contour mark
+                    viscircles(pipCentre,piprad,'EdgeColor','blue');    % draw pipette anchor mark
+                    text(20,20,strcat('Frame: ', num2str(count),'/',num2str(obj.trackedFrames)));   % annotate the video
                     vidFrame = getframe(haxes);
                     writeVideo(vidWriteObj,vidFrame);
                     count = count + Sampling;
                     totCount = totCount + Sampling;
                 end;
             end;
-            close(vidWriteObj);
+            close(vidWriteObj);     % close the video object
             disp('Frames finished: 100 %');
         end
         
-        
-        % triggers force calculating procedure
+        %% Calculate the force for all successfully tracked intervals
+        % triggers force calculating procedure; calculates probe stiffness
+        % in the process
         function [overLimit] = getForce(obj, hplot, calib)
             
-            overLimit = false;
+            overLimit = false;  % if the extension is over the limit
             
             if ( ~any(obj.tracked) )
                 warndlg('No tracking data. Running tracking methods','Tracking data not available','replace');
@@ -537,7 +582,7 @@ classdef BFPClass < handle
             end
             
             % verify, if number of reference distances matches the number
-            % of reference intervals - this error would be very strange
+            % of reference intervals -- this error would be very strange
             if (sum(refdist~=0) ~= sum(obj.tracked))
                 warndlg({'Number of detected reference distances does not match the number of approved intervals';...
                     'This is very strange, because previous checks should have averted this.';...
@@ -546,6 +591,7 @@ classdef BFPClass < handle
                 return;
             end;
             
+            % prepare the plotting area (axes)
             cla(hplot,'reset');
             rotate3d(hplot,'off');
             hold(hplot,'on');
@@ -598,6 +644,7 @@ classdef BFPClass < handle
             end
         end
         
+        %% Return particular data for a requested frame
         % return force value by frame;  %TODO: ADD INPUT PARSER
         function [value] = getByFrame(obj,frm,type)
             
@@ -637,6 +684,7 @@ classdef BFPClass < handle
             end
         end
         
+        %% Data importing function
         % imports outer data into GUI; note that data must be formatted in
         % columns; first column is frame number, second column is
         % force/contrast value; in case of coordinates, the first column
@@ -716,7 +764,9 @@ classdef BFPClass < handle
             
         end
         
-        % generates post-track report, with bad frames
+        %% Tracking fidelity report
+        % generates post-track report, with bad frames, reporting
+        % underperforming intervals and explaining the situation
         function [ ] = generateReport(obj)
             intervalstr = 'Intervals of uncertainty:\n\n';
             hrepfig = figure;
@@ -785,7 +835,7 @@ classdef BFPClass < handle
             
         end
         
-        
+        %% Calculate RBC stiffness
         % calculates values of RBC stiffness ('k') and its uncertainty ('Dk')
         function [ ] = getStiffness(obj)
             % Rg - radius of RBC
@@ -814,6 +864,7 @@ classdef BFPClass < handle
             obj.Dk = obj.k * (  (obj.DP/obj.P)^2 + (obj.DR/obj.Rp)^2 + (DkDrp*Drp)^2 + (DkDrc*Drc)^2 )^0.5;
         end
         
+        %% pix <-> micron methods
         % distance units transformations          
         function [um] = px2um(obj,px); um = px * obj.P2M; end
         
@@ -823,6 +874,7 @@ classdef BFPClass < handle
     
     methods (Access = private)
     
+        %% Data erasing function
         % called by other functions to delete data (e.g. before other data
         % are imported); might be changed to eraseByFrame, if appropriate
         function erase(obj,type)
@@ -845,7 +897,8 @@ classdef BFPClass < handle
 end
 
 
-% ================ CLASS RELATED FUNCTIONS =========================
+%% ================ CLASS RELATED FUNCTIONS =========================
+
 % fills gaps between reported bad frames, to estimate bad intervals
 function [badInts] = fillHoles(badFrames)
     inds = find(badFrames);
