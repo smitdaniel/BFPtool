@@ -105,7 +105,7 @@ handles.remove = [];        % list of interval entries to remove from the comple
 handles.updpatframe = 0;    % pipette pattern originating frame, updated during addition process
 handles.calibint = [];      % single-frame interval in case a calibration frame needs to be set up
 
-%% Plotting and fitting settings structures
+%% Plotting and fitting settings variables
 handles.lowplot     = 1;    % lower bound of plotted data
 handles.highplot    = 10;   % upper bound of plotted data
 handles.toPlot      = 1;    % quantity to be plotted (1=contrast, 2=track (3D), 3=trajectories (2D), 4=force, 5=metrics)
@@ -643,7 +643,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %    end
 
 %% Import function
-    % allows various import possibilities
+    % controls various import possibilities
     function import_callback(~,~)
         var = handles.hvar.Value;       % which variable is to be imported; 1=force & track, 2=frame, 3=graph, 4=parameters
         src = handles.htar.Value;       % target of the import; 1=workspace, 2=datafile, 3=figure
@@ -737,7 +737,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 %% Export function
-    % allows various combinations of figure elements and targets of export
+    % controls various combinations of figure elements and targets of export
     function export_callback(~,~)
         var = handles.hvar.Value;       % which variable is to be exported; 1=force & track, 2=frame, 3=graph, 4=parameters
         tar = handles.htar.Value;       % target of the export; 1=workspace, 2=datafile, 3=figure
@@ -904,7 +904,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 %% I/O settings for various in/out target combinations
-    % choosing various combinations has various effects
+    % choosing various combinations of target/source for import/export; not
+    % all the combinations are possible
     function port_callback(~,~)
         var = handles.hvar.Value;
         tar = handles.htar.Value;
@@ -979,20 +980,21 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 %% Set verbose or more silent input
-    % sets the 'handles.verbose' flag
+    % sets the 'handles.verbose' flag; this usually switches warning
+    % dialogs to command line warnings
     function verbose_callback(source,~)
         handles.verbose = logical(source.Value);
     end
 
 %% Change UI control (mostly button) for input (edit field)
-    % changes UI to allow user input
+    % changes UI to allow user input; for plateaux detection
     function platswitch_callback(source,~,setter)
         source.Visible = 'off';
         setter.Visible = 'on';
     end
 
 %% Read input value (edit field) and set variable
-    % reads and sets the value
+    % reads and sets the value from the UI element; plateaux detection
     function getplat_callback(source,~,var)
         val = str2double(source.String);
         if ( isnan(val) || val < 0 )
@@ -1028,7 +1030,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
     
 %% Fitting function
-    % fitting the graph; only one type of fitting line at the time
+    % fitting the graph; only one type of fitting line at the time; fitted
+    % line is redrawn; every separate line object is fittend by a line
+    % (i.e. several fitting lines for discontiguous graph)
     function fit_callback(~,~,type,limit)
         
         % delete descriptive objects
@@ -1260,7 +1264,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %% Fitting interval selection
     % this is a bit tricky with preserving correct settings for hit test,
     % video frame-graph click connection, no freeze etc
-    % select interval for fitting; make sure to catch exceptions
+    % select interval for fitting; make sure to try/catch
     function fitint_callback(~,~)
         if handles.selecting;       % there is a strange interplay between uiwait/waitfor functions ...
             warn('select');         % ...this approach is a bit awkward, but fail-safe
@@ -1336,7 +1340,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                 num2str(round(hline(2).cx)),']</HTML>');
     end
 
-%% Returns position of the cursor click
+%% Returns position of the cursor click, draws vertical line in the graph
     % return coordinates of cursor on the graph; delcall is only deleting
     % the marking in the graph
     function getcursor_callback(source,~,delcall)
@@ -1389,7 +1393,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.toPlot = source.Value;
     end
        
-%% Set range of plot
+%% Set frame range of plot
     % set the range for plot
     function plotrange_callback(source,~,oldval,var)
        handles.lowplot = round(str2double(handles.hlowplot.String));            % save the values
@@ -1408,7 +1412,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 %% Plotting control function
-    % plot selected quantity (numbered 1-5)
+    % plot selected quantity (numbered 1-5), #1 contrast measure (SD2,
+    % rSD2), #2 tracks (3D) with 3rd axis as time, #3 trajectories (2D), #4
+    % force (+ right y-axis as deformation), #5 metrics
     function graphplot_callback(~,~)
         camup(handles.hgraph,'auto');
         campos(handles.hgraph,'auto');
@@ -1489,7 +1495,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 %% Call to start force calculation
-    % gets parameters for calculation, calculates (&shows) 'k', gets force
+    % gets parameters for calculation, calculates (& shows) 'k', gets force
+    % checks if initial probe parameters were modified and issues warning
     function runforce_callback(~,~)
         % if verbose and geometric parameters were not changed, warn
         if (handles.RBCradius == RBC && handles.PIPradius == PIP && handles.CAradius == CON)    % nothing measured
@@ -1521,7 +1528,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hhighplot.String = num2str(handles.highplot);
         tmplines = findobj(handles.hgraph,'type','line');
         if ~isempty(tmplines)
-            plotZeroLine();     % mark line of zero force
+            plotZeroLine(); % mark line of zero force
         end
         makeStiffAnot();    % display RBC stiffness info
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};
@@ -1546,7 +1553,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 
 %% Update BFPClass object containing tracking and force settings
     % procedure to create BFPClass object, which performs all the
-    % calculations
+    % calculations; if object exist, it is overwritten with settings
+    % currently selected in the GUI
     function update_callback(~,~)
         BFPobj = BFPClass(vidObj.Name, vidObj ,handles.intervallist);
         BFPobj.getBeadParameters(handles.beadradius,handles.beadbuffer,handles.beadsensitivity,handles.beadgradient,handles.beadmetricthresh,handles.P2M);
@@ -1557,7 +1565,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %% Add an interval to the set of tracking intervals
     % adds currently defined interval to the list of intervals
     % runs mady integrity checks, communicates issues to the user, performs
-    % corrections and even runs small functions to get user input
+    % corrections and even runs small functions to get user input;
+    % Note that this is quite complex and cornerstone function. It manages
+    % the interval addition in a way the final interval list retains
+    % integrity and the tracking results are then clear and meaningful.
     function addinterval_callback(~,~)
         
         % make input interval copy, to track corrective changes
@@ -1966,8 +1977,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         if isgraphics(hpatfig); close(hpatfig); end;     % close the figure (if not closed)
     end
 
-%% Set the video frame to the first fram of the interval
-    % set current frame to the first frame of the interval
+%% Set the video frame to the first frame of current interval
+    % set current frame to the first frame of the interval; useful when
+    % selecting initial bead position
     function gotointframe_callback(~,~)
         if isempty(handles.interval) || ~isfield(handles.interval,'frames') ||...
            isempty(handles.interval.frames) || handles.interval.frames(1) == 0;
@@ -1980,7 +1992,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 %% Get the selected bead in the list as the bead for current interval
-    % saves the currently open bead for this interval to track
+    % saves the currently open bead coor for this interval to track
     function getintbead_callback(~,~)
         % check if there is a bead in the list to add
         if numel(handles.beadlist)==0 || isempty(handles.beadlist(handles.hbeadinilist.Value));
@@ -2042,7 +2054,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.haddinterval.Enable = 'on';
         handles.hgetrefframe.Enable = 'on';
     end
-                
+
+%% Display selected pipette pattern
     % displays the pattern selected for the given interval
     function [hpatfig,hpataxes] = showintpattern_callback(~,~)
         if ~isfield(handles.interval,'pattern') || isempty(handles.interval.pattern);
@@ -2059,6 +2072,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end;
     end
 
+%% Attempts to correctly obtain the reference distance frame
     % get reference frame for the currently selected pattern
     function getrefframe_callback(~,~)
         if (~isfield(handles.interval,'pattern') || ...
@@ -2073,6 +2087,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                 ,num2str(round(handles.interval.patsubcoor(2))),']');
     end
 
+%% Read input reference dist frame from edit field
     % set reference frame, where the RBC is not strained
     function setrefframe_callback(source,~,oldval)
         val = round(str2double(source.String));
@@ -2088,6 +2103,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
+%% Frame range of the interval selection
     % set the range of frames to track
     function setintrange_callback(source,~,oldval,num)
         in = str2double(source.String);
@@ -2116,7 +2132,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hendint.Callback = {@setintrange_callback,high,2};
     end
 
-    % measure radius of the pipette
+%% Measuring geometric properties of the probe
+    % measure radius of the pipette, contact, scale by drawing a line
     function measureLength_callback(source,~,type)
         if handles.selecting; 
             warn('select');
@@ -2185,7 +2202,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.selecting = false;
     end
 
-    % detects the RBC and measures its radius, using the TrackBead method
+%% Measuring the RBC radius
+    % detects the RBC and measures its radius, using the TrackBead method;
+    % TODO: make sure pixel to micron ratio is considered. If the RBC is
+    % too large (or small) in the video, it wouldn't be detected
     function measureRBC_callback(source,~)
         if handles.selecting;   % make sure only one selection runs at a time
             warn('select');
@@ -2232,6 +2252,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.selecting = false;  % remove handles.selecting flag
     end
 
+%% Read and set input experimental values
     % set experimental parameters; validate input
     function setexpdata_callback(source,~,oldval)
         input = str2double(source.String);
@@ -2248,6 +2269,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         source.Callback = {@setexpdata_callback,input};
     end
 
+%% Pipette buffer
     % set pipette tracking grace period
     function pipbuffer_callback(source,~)
         val = str2double(source.String);
@@ -2261,6 +2283,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         source.String = num2str(handles.pipbuffer);
     end
 
+%% Setting thresholds for tracking
     % set contrast threshold value
     function pipcontrast_callback(source,~)
         handles.contrasthresh = source.Value;
@@ -2304,6 +2327,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         source.String = num2str(handles.beadbuffer);
     end
 
+%% Runs bead detection and deduces bead radius range for tracking
     % get approximate range for MB radius interactively, in pixels
     function getradrange_callback(source,~,tag)
         
@@ -2329,7 +2353,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.selecting = false;  % remove selection lock
  
     end
-        
+
+%% Set bead detection radius range
     % set limit on radius for the bead tracking; verify correct input
     function setrad_callback(~,~)
         vmin = str2double(handles.hminrad.String);
@@ -2348,7 +2373,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
-
+%% Bead list functions
     % add the selected bead coordinate to list
     function addbead_callback(~,~)
         if isempty(handles.lastlistbead);
@@ -2388,6 +2413,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Pattern list functions
     % button adds current pattern to the pattern list
     function addpattern_callback(~,~)
         if isempty(handles.lastlistpat);
@@ -2427,6 +2453,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         setpattern(handles.patternlist(val));                
     end
 
+%% Detect bead in the frame as initial position for tracking
     % select the centre of the bead as a seed for tracking
     function getpoint_callback(source,~,srctag)
         
@@ -2479,7 +2506,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.selecting = false;  % release detection lock
         
     end
-        
+
+%% Gets pattern for the pipette tip
     % allows user to select rectangular ROI as a pattern file
     function getrect_callback(source,~,srctag)
         
@@ -2522,6 +2550,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 
     end
 
+%% Get path of the video file
     % set video path by typing it in
     function videopath_callback(source,~)
         handles.videopath = source.String;
@@ -2540,6 +2569,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Settings for ouput video
     % sets frame rate of the output generated video
     function outvideo_callback(source,~,failsafe,var)
         val = round(str2double(source.String));
@@ -2563,12 +2593,16 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         BFPobj.generateTracks('Framerate',handles.outframerate,'Sampling',handles.outsampling);
     end
 
+%% Display tracking overlay
     % whether to display or not the tracking data results
     function disptrack_callback(source,~)
         handles.disptrack = source.Value;
     end
 
-    % plot the contrast progress of the video
+%% Calculate (if not) and plot the video SD2 contrast
+    % calculate SD2 contrast and plot the contrast progress of the video,
+    % it can also be switched to rSD2 contrast, SD2 contrast is analyzed
+    % and intervals of low contrast marked
     function getcontrast_callback(~,~,srctag)
         % if video is long, issue notice
         if vidObj.Frames > 1000 && handles.verbose && numel(vidObj.Contrast) ~= vidObj.Frames
@@ -2658,6 +2692,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hgraph.ButtonDownFcn = {@getcursor_callback};
     end
 
+%% Go to frame
     % sets frame input into edit field after pressing a button
     function gotoframe_callback(~,~)
         % temporary edit field
@@ -2678,7 +2713,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             delete(hsetframe);  % delete the edit field
         end
     end
-                
+
+%% Video playback functions
     % rewinds or fast forwards video; argument sense is usually +/-5 frames
     % but the value can be changed in backdoorObj
     function fastvideo_callback(~,~,sense)
@@ -2710,6 +2746,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hplaybutton.Callback = {@playvideo_callback,1}; % restores play callback, sets framerate to 1
     end
 
+%% Open video defined by path
     % open video and set its parameters where necessary; update callbacks
     function [newOpenned] = openvideo_callback(~,~)
         newOpenned = false;
@@ -2773,9 +2810,11 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         setframe(source.Value);
     end
 % ==================================================================
-%   ======================== HELPER FUNCTIONS ======================
-   
-    % detect and return pipette pattern
+%%   ======================== HELPER FUNCTIONS ==========================
+
+%% Extract the pipette pattern from the frame
+    % detect and return pipette pattern based on the selected area;
+    % try/catch in case user interrupts the selection
     function [ patinfo,pass ] = getPattern( source, tag )
         
         patinfo = struct('coor',[],'frame',[],'reference',[], 'cdata', [], 'anchor', []);
@@ -2864,7 +2903,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
-    % detect and return bead information
+%% Detect the bead near the click-provided coordinate
+    % detect and return bead information; calls TrackBead method; provides
+    % also bead detection radius range calibration
     function [ beadinfo,pass,rad ] = getBead( source,tag, varargin )
         
         persistent inpar;   % persistent parser, created only once
@@ -2964,7 +3005,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                      
     end
 
-
+%% Select and display pattern from the list
     % selects pattern
     function [] = setpattern(pattern_in)
        handles.pattern = pattern_in;
@@ -2972,13 +3013,21 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
        axis(handles.hminiaxes, 'image','off');    
     end
 
+%% Small video procedures
     % returns current frame number; can be changed to more complex and
     % failsafe behaviour (now's just ridiculous, I know)
     function [currentFrame] = getFrame()
         currentFrame = handles.vidFrameNo;
     end
 
-    % sets the GUI to the given frame number
+    % check if this frame is part of the video
+    function [ is ] = isinvideo(frame)
+        is = ( frame > 0 && frame <= vidObj.Frames );
+    end
+
+%% Set requested frame number as current frame
+    % sets the GUI to the given frame number; takes case of drawing the
+    % detection overlay, if requested
     function [] = setframe(frameNo)
         handles.vidFrameNo = round(frameNo);
         handles.frame = vidObj.readFrame(handles.vidFrameNo);
@@ -3006,6 +3055,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Video information report
     % populates the video information pannel
     function setvidinfo()
         handles.hvidwidth.String = strcat('Width: ',num2str(vidObj.Width),' px');
@@ -3019,7 +3069,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
-   
+%% Copy strcture   
     % copy structure into an empty target
     function outlist = strucopy(outlist,item)
         size = numel(outlist);
@@ -3029,6 +3079,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
     
+%% Validate new pip pattern against already present patterns
     % search if the current pattern is already present in the list and user
     % appropriate reference frame and anchor, if it is
     % in: pattern: the image array; patframe: the frame of origin of image,
@@ -3070,11 +3121,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
-    % check if this frame is part of the video
-    function [ is ] = isinvideo(frame)
-        is = ( frame > 0 && frame <= vidObj.Frames );
-    end
-
+%% Generate table with intervals
     % generates table of intervals from the intervallist entries
     function makeTab()
         
@@ -3095,6 +3142,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                'ColumnWidth',{52},'CellEditCallback',@rmtabledint_callback);
     end
 
+%% Contrast type radiobutton switch
     % radio button group selection change callback
     % determines which type of contrast will be plot
     function contype_callback(~,data)
@@ -3112,6 +3160,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end                
     end
 
+%% Exponential fit of graphed data
     % fits data with one-parametric exponentiel
     function [ est, FitCurve ] = expfit( int, frc, varargin )
             
@@ -3152,6 +3201,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             [~, FitCurve] = model(est);
     end 
 
+%% Generate valid name of file to save data/image/figure
     % function to set up path for a file to save
     function [ exportfile ] = putFileName(name)
         dataList = { '.csv','.txt','.dat' };
@@ -3186,6 +3236,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Get valid name and path of file to load data
     % function to set up path for a file to load
     function [importfile] = getFileName(name)
         dataList = { '.csv','.txt','.dat' };
@@ -3216,6 +3267,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
+%% Warning function
     % function to display warning dialogue or just command line warning,
     % depending on the 'handles.verbose' variable; Some warning messages are preset
     % otherwise, the passed string is displayed
@@ -3250,6 +3302,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
+%% Plot horizontal line of zero load/deformation
     % plots red dashed line at y=0 to indicate pushing and pulling
     function plotZeroLine()
         handles.hzeroline = plot(handles.hgraph,handles.lowplot:handles.highplot,zeros(1,handles.highplot-handles.lowplot+1),...
@@ -3262,6 +3315,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             'FontSize',handles.labelfontsize,'Margin',5,'HitTest','off');
     end
 
+%% RBC stiffness annotation
     % generates RBC stiffness annotation after the force was run
     function makeStiffAnot()
         if isempty(BFPobj)||isempty(BFPobj.k)
@@ -3278,6 +3332,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             'LineStyle','none','FitBoxToText','off','Color',colour,'FontUnits','normalized');
     end
 
+%% Export the whole environment
     function saveEnvironment(fileName)
         % GUI settings
         for dat = 1:numel(GUIdata)
@@ -3310,6 +3365,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         save(fileName,'outgoing');
     end
 
+%% Load a full saved session from a file
     function loadEnvironment(fileName)
         
         in = load(fileName);
@@ -3395,7 +3451,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 %   ====================================================================
-%   ============== SINGLE-FRAME CALIBRATION FUNCTIONS ==================    
+%%   ============== SINGLE-FRAME CALIBRATION FUNCTIONS =================    
 %   The single frame calibration is necessary, if the reference distance
 %   frame (i.e. the frame, where the bead and the RBC just touch, with zero
 %   load incurred on the bead) is not part of any tracked interval. Then,
@@ -3404,6 +3460,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %   matched and select the appropriate bead (in case more beads are
 %   present).
 
+%% Create new figure, where user can calibrate the probe
     % constructs the calibration figure, uicontrols etc.
     function [hcalibfig]= buildCalibFig()
         
@@ -3458,6 +3515,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
+%% Accept input calibration information
     % verifies the data and closes the calibration window
     function acceptcalib_callback(~,~)
         if ~isempty(handles.calibint.beadcoor) && ~isempty(handles.calibint.contrast) && handles.calibint.acceptedpip;
@@ -3477,6 +3535,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Select bead for calibration
     % allows user to select the appropriate bead
     function getcalibead_callback(source,~,hax,frm)
         persistent hviscirc;
@@ -3500,6 +3559,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         if isgraphics(hviscirc); hviscirc.Visible = 'on'; end;      % show the circle
     end
 
+%% Confirm detected pipette pattern
     % confirm proper pipette pattern detection; note user cannot reposition
     % the pipette pattern in the calibration interval. If program is unable
     % to detect the pattern, it is unlikely this calibration would be of
@@ -3513,7 +3573,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
-
+%% Reject detected pipette pattern
     % reject automatically detected pipette and abort the single-frame calibration
     function rejectpipette_callback(~,~)
         hw = warndlg(strjoin({'The incorrect detection of the pipette pattern in the calibration frame',...
@@ -3525,6 +3585,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         delete(gcf);    % close calibration window
     end
 
+%% Close calibration window
     % callback after close request of calibration figure
     function calibfigCleanup_closereq(~,~)
         
@@ -3544,10 +3605,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
     end
 
-
-
 %   =====================================================================
-%   ======== PAY NO ATTENTION TO THE MAN BEHIND THE CURTAIN =============
+%%   ======== PAY NO ATTENTION TO THE MAN BEHIND THE CURTAIN ============
 %   Like a wizard behind a curtain, this set of calls allows to unmess
 %   minor inconveniences, mostly resulting from errors, which leave various
 %   global variables switched to locked state. It can be called through

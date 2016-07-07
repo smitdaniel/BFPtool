@@ -58,7 +58,7 @@ classdef BFPClass < handle
         % bead tracking settings
         radius;         % range of radii to track the bead in
         buffer;         % max. frames of failed detection in a row
-        sensitivity;    % bead sensitivity (thresh for accum. array)
+        sensitivity;    % bead sensitivity (1-sensitivity=thresh for accum. array)
         edge;           % edge detection thresh
         metric;         % bead detection metric thresh (based on accum array)
         
