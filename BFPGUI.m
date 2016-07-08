@@ -15,6 +15,23 @@
 %   ======================================================================
 
 function [ backdoorObj ] = BFPGUI( varargin )
+%% Add help path into Matlab path
+    [apppath,~,~] = fileparts(mfilename('fullpath')); % path to the current M-file (BFPGUI.m)
+    apphtmls = numel(strfind(apppath,'html'));    % find possible html strings in app path (would usually be 0)
+    allpath=genpath(apppath);   % get all the subfolders below BFPGUI folder (avoid direct path manipulation because of platform problems)
+    while(allpath)
+        [helpstr,allpath]= strtok(allpath,':'); % tokenize all subfolders
+        fphtml = strfind(helpstr,'html');       % find positions of htmls in the full path 
+        fphtmls = numel(fphtml);    % number of htmls in the full path
+        if fphtmls-apphtmls > 0;    % a html exist after app path
+            helpstr = helpstr(1:fphtml(apphtmls+1)+3);    % cut the string after the first html subfolder
+            break;  % stop when outer 'html' folder is found
+        end;
+        helpstr=[]; % delete string if nothing found
+    end
+    if ~isempty(helpstr)
+        addpath(helpstr);  % add path to html folder
+    end
 
 %% Importing data
     % verify if passed input is a MAT file
@@ -2961,7 +2978,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             else
                 defaultRad = handles.beadradius;
             end
-                
+
             [coor,rad,metric,~] = TrackBead(vidObj, beadinfo.contrast, beadinfo.coor,...
                          [ beadinfo.frame, beadinfo.frame ], 'radius', defaultRad, 'retries', 1 );  % try to detect the bead in the frame
 

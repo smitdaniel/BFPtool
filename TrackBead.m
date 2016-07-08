@@ -81,12 +81,18 @@ parse(inp, vidObj, contrast, inicoor, varargin{:});
 vidObj   = inp.Results.vidObj;
 contrast = inp.Results.contrast;
 inicoor  = [inp.Results.inicoor(2), inp.Results.inicoor(1)];   % [x,y] -> [r,c]
-range    = inp.Results.range;
+if (inp.Results.range == -1); 
+    range = [1, vidObj.Frames];     % whole video
+elseif numel(inp.Results.range)==1
+    range = round([inp.Results.range,inp.Results.range]);  % single frame interval
+else
+    range = round(inp.Results.range);  % defined interval
+end;
 framesToPass = range(2)-range(1)+1;     % number of frames to parse
 radius   = inp.Results.radius;
 radius(1)= max(radius(1),1);            % make sure lower bound is non-negative
 radius(2)= max(radius(1),radius(2));    % make sure r(2) >= r(1)
-buffer   = inp.Results.buffer;
+buffer   = round(inp.Results.buffer);
 sensitivity = inp.Results.sensitivity;
 edge     = inp.Results.edge;
 side     = inp.Results.side;
@@ -113,14 +119,13 @@ haradius = radius;
 % sets OUT variables and temporary variables
 
 warn = 1;   % frame number of the last warning
-if (range == -1); range = [1, vidObj.Frames]; end;     % set full range, if not given
 box = [floor( inicoor - side); ceil( inicoor + side)]; % set box around provided coordinate; [r,c]
 
 radii = zeros( range(2) - range(1) + 1,1);      % preallocate; radii of the beads
 centres = zeros( range(2) - range(1) + 1, 2);   % proallocate; centres of the bead
 centres(1,:) = double(inicoor);                 % in [r,c] coordinates
 metrics = zeros( size(radii,1), 1);             % preallocate; metric of the bead detection
-if range(2)-range(1)>0; filmContrast = vidObj.getContrast(range(1),range(2)); end;            % get a lazy copy of contrast
+filmContrast = vidObj.getContrast(range(1),range(2));   % get a lazy copy of contrast
 badFrames = false( size(radii,1),1 );           % preallocate array for bad frames
 
 % indices
@@ -247,7 +252,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     % reaction to outliers
     
     metricTest = mean(metrics( max(frames-review,1):frames ));
-    if(range(2)-range(1)>0); contrastTest = mean( filmContrast( max(frames-review,1):frames ));end;
+    contrastTest = mean( filmContrast( max(frames-review,1):frames ));
 
     % adapt thresholds if quality of descriptors is low
     if ( metricTest < robust - threshRelaxes(1) * 0.05 ...

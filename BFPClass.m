@@ -687,7 +687,7 @@ classdef BFPClass < handle
         %% Data importing function
         % imports outer data into GUI; note that data must be formatted in
         % columns; first column is frame number, second column is
-        % force/contrast value; in case of coordinates, the first column
+        % force/contrast value; in case of coordinates, the second column
         % x-coordinate, third column y-coordinate
         function importData(obj,type,data,varargin)
             
@@ -767,7 +767,7 @@ classdef BFPClass < handle
         %% Tracking fidelity report
         % generates post-track report, with bad frames, reporting
         % underperforming intervals and explaining the situation
-        function [ ] = generateReport(obj)
+        function [hrepfig] = generateReport(obj)
             intervalstr = 'Intervals of uncertainty:\n\n';
             hrepfig = figure;
             hrepax = axes('Parent',hrepfig,'Units','normalized','OuterPosition',[0,0,0.7,1],...
