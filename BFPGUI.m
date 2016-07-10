@@ -934,7 +934,15 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 elseif tar==3   % figure/image
                     htempfig = figure('Name','transient','Visible','on');
                     hnewaxes = copyobj(handles.hgraph,htempfig);
+                    hax2 = findobj('Tag','deformationaxis');
+                    if ~isempty(hax2)
+                        hax2 = copyobj(hax2,htempfig);
+                    end
                     set(hnewaxes, 'Units','normalized','OuterPosition',[0,0,1,1]);  % save access, fill the whole figure
+                    hnewaxes.YLim = handles.hgraph.YLim;    % this does not copy well otherwise
+                    hpos = hnewaxes.Position;
+                    set(hax2,'Units','normalized','Position',[hpos(1)+hpos(3),hpos(2),0,hpos(4)]);
+                    hax2.YLim = handles.hgraph.YLim/BFPobj.k;
                     fileName = putFileName('BFPgraph.fig'); % call to set up filepath
                     if isequal(fileName,0); return; end;    % return if cancelled
                     saveas(htempfig,fileName);              % save the trans. figure
