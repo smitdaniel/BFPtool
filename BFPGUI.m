@@ -2515,7 +2515,11 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             handles.selecting = true;
         end
             
+        vidObj.CurrentFrame
+        
         [handles.bead,pass,~] = getBead(source,srctag);  % call method to detect bead
+        
+        handles.bead.frame
         
         % if detection fails (reject or error), old 'handles.bead' value is returned
         % if old value is empty, stop here, do not change anything
@@ -2960,12 +2964,13 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
         persistent inpar;   % persistent parser, created only once
         
+        
         % create parser instance, if not present
         if isempty(inpar)            
             inpar = inputParser();
-            defaultAxHandle = handles.haxes;    % default axes are main figure axes
-            defaultFrame    = vidObj.CurrentFrame;
+            defaultAxHandle = handles.haxes;    % default axes are main figure axes            
             defaultCallback = @getpoint_callback;   % to reset source cbk
+            defaultFrame    = -1;   % no input, flag as -1 (any more elegant solution more than welcome)
 
             inpar.addRequired('source');    % calling uicontrol
             inpar.addRequired('tag');       % call from list or direct
@@ -2980,8 +2985,12 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         source = inpar.Results.source;
         tag = inpar.Results.tag;
         hax = inpar.Results.hax;
-        frm = round(inpar.Results.frm);
         cbk = inpar.Results.cbk;
+        if inpar.Results.frm==-1;   % no input, use current frame
+            frm = vidObj.CurrentFrame;
+        else    % use passed frame
+            frm = inpar.Result.frm;
+        end        
         % =============================================================
         
         beadinfo = struct('coor',[],'frame',[],'contrast',[]);

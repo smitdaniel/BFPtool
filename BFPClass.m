@@ -692,11 +692,11 @@ classdef BFPClass < handle
         function importData(obj,type,data,varargin)
             
             persistent inp;
-            expectedTypes = { 'force', 'beadPositions', 'pipPositions' };
+            expectedTypes = { 'force', 'beadPositions', 'pipPositions' }; 
             
             if isempty(inp)
                 inp = inputParser();
-                defaultRange = [ min(data(:,1)), max(data(:,1)) ];                
+                defaultRange = -1;                
 
                 inp.addRequired( 'type', @(x) any(validatestring(x,expectedTypes)) );
                 inp.addRequired( 'data', @isnumeric );
@@ -706,7 +706,11 @@ classdef BFPClass < handle
             inp.parse(type,data);
             type = inp.Results.type;    % which data are imported/overwritten
             data = inp.Results.data;    % the data to import in form of (numeric) array
-            range = inp.Results.range;  % range of frames
+            if inp.Results.range == -1
+                range = [ min(data(:,1)), max(data(:,1)) ]; % default value
+            else
+                range = inp.Results.range;  % range of frames
+            end
             % ============================================================
             
             persistent importedData;    % flag if data's imported or not
