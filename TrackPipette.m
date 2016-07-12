@@ -49,6 +49,7 @@ if isempty(inp)
     defaultWideField    = false;      % perform serach in the full field    
     defaultBuffer       = 5;          % grace period if search for pattern fails
     defaultWaitbar      = [];         % no default waitbar handle
+    defaultDilate       = 2;          % number of pixels to dilate/erode pattern for trials
     
     addRequired(inp,'vidObj');
     addRequired(inp,'pattern');
@@ -59,7 +60,8 @@ if isempty(inp)
     addParameter(inp,'quality', defaultImageQuality, @isnumeric);
     addParameter(inp,'wideField', defaultWideField, @islogical);
     addParameter(inp,'buffer', defaultBuffer, @(x) ( ~isnan(x) && x > 0) );
-    addParameter(inp,'waitbar', defaultWaitbar, @isgraphics)
+    addParameter(inp,'waitbar', defaultWaitbar, @isgraphics);
+    addParameter(inp,'dilate', defaultDilate, @(x) (isnumeric(x) && (numel(x) == 1 || numel(x)==2)) );
 end
 
 parse(inp, vidObj, pipette, varargin{:} );
@@ -97,6 +99,11 @@ else
     htrackbar = inp.Results.waitbar;
     wbStep = ceil(framesToPass/100);      % redraw after 1 %
 end;
+if numel(inp.Results.dilate)==1
+    dilate=[inp.Results.dilate, inp.Results.dilate];    %dilate and erode the same ammount
+else
+    dilate=[inp.Results.dilate];    % two numbers were passed otherwise
+end
 % ======================================================================
 
 %% ==== Set up computation variables ====
@@ -291,7 +298,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
             wideFieldSearch(2);
             lastWF = frames;
             if metricTest <= robust(2);     % metric is still too poor
-                dilatedPatternSearch(-1);   % uses dilated/eroded pattern from the initial frame to try to detect
+                dilatedPatternSearch(dilate);   % uses dilated/eroded pattern from the initial frame to try to detect
                 if metricTest <= robust(1)  % the xcorr is failing;
                     badFrames(frames,:) = true;     % log a bad frame
                     if strcmp(choice,'report') && frames-warnSev(1) >= 10;
@@ -310,7 +317,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
                     end
                     end
                 elseif metricTest <= robust(2) && frames-warnSev(2) >= 10;
-                    warning(strjoin({'At frame %d, the detection experiences severe uncertainty,',...
+                    warning(strjoin({'At frame %d, the pipette detection experiences severe uncertainty,',...
                         'but still remains above the minimum threshold.',...
                         'Corrective measures were not sufficient.',...
                         'The metric is %.3f above the minimum threshold %.3f '}), thisFrame, metricTest, robust(1));
@@ -382,24 +389,32 @@ end;
     % in case of low metric results, the program tries to increase match
     % by selecting larger pattern than initially. The pattern is 
     % dilated/eroded by C-pixels in every direction.
-    % C < 0 erosion, C > 0 dilatation
+    % C(1), erosion; C(2), dilatation
     function [improved] = dilatedPatternSearch(C)
         % tries to localte the pattern in interval's first frame. If
         % detection is reliable enough, continues with the procedure. The
         % function is not used again, if reliable pattern location can't be
         % established in the frame.
         
+        if numel(C) ~= 2    % not an interval input
+            return;
+        end
+        
         improved = false;
         persistent confirmed;           % an initial test says, if method can be used in interval or not
         if ~isempty(confirmed);
             if ~confirmed; return; end; % if pipette is not confirmed (in 1st frame), return
         end
+        if C(1)==0 && C(2)==0;  % case of no erosion no dilatation
+            confirmed=false;
+            return;
+        end
         persistent wfPos;
         persistent wfMet;
         if isempty(wfMet)
-            [wfPos,wfMet] = TrackPipette( vidObj, pipette, [inicoor(2),inicoor(1)], range(1),'wideField',true);   % search the original pattern in the first wide field frame
+            [wfPos,wfMet,~] = TrackPipette( vidObj, pipette, [inicoor(2),inicoor(1)], range(1),'wideField',true);   % search the original pattern in the first wide field frame
         end;
-        if wfMet < dilatedRobust;    % if pattern at intervals init. frame matches orig. pattern less than dilatedRobust, abort
+        if wfMet < dilatedRobust;    % if pattern at interval's init. frame matches orig. pattern less than dilatedRobust, abort
             improved = false;
             confirmed = false;
             warndlg(strjoin({'Method attempts to improve detection by trying to dilate the',...
@@ -410,29 +425,54 @@ end;
                 ' choosing another pattern.'}));
             return;
         end;
+        
 
-        persistent dilPipette
+        persistent dilPipette;   % dilated pipette pattern array
+        persistent wfShift;
         if isempty(dilPipette)
             firstFrame = vidObj.readFrame(range(1));    % read the first frame of the interval
-            wfPos = round(wfPos);
-            dilFrame = [ max( wfPos(1)-C,1 ), min(wfPos(1)-1+C+pipDim(1),frameDim(1)); ...
-                         max( wfPos(2)-C,1 ), min(wfPos(2)-1+C+pipDim(2),frameDim(2))];
-            dilPipette = double(firstFrame.cdata( dilFrame(1,1):dilFrame(1,2), dilFrame(2,1):dilFrame(2,2),: ));    % pipette pattern dilated by 2 pixels on each side
+            wfShift = wfPos - round(wfPos); % save offset of the array from max. likely location
+            wfPos = round(wfPos);           % get rounded position
+            dilPipette = struct('frame',[]);% create empty structure
+            for V=-C(1):1:C(2)
+                if (V>0 && (wfPos(1)-V < 1) || (wfPos(1)-1+V+pipDim(1) > frameDim(1)) ||...
+                           (wfPos(2)-V < 1) || (wfPos(2)-1+V+pipDim(2) > frameDim(2)) )   % if new pipette is out of filed
+                    C(2)=V-1;   % stop pattern generation
+                    break;
+                end                       
+                dilFrame = [ wfPos(1)-V, wfPos(1)-1+V+pipDim(1); ...
+                             wfPos(2)-V, wfPos(2)-1+V+pipDim(2)];
+                dilPipette(V+C(1)+1).frame = ...
+                    double(firstFrame.cdata( dilFrame(1,1):dilFrame(1,2), dilFrame(2,1):dilFrame(2,2),: ));    % pipette pattern dilated by C pixels on each side
+            end
+        end
+
+        dpPos=zeros(C(2)+C(1)+1,2);   % preallocate positions...
+        dpMet=zeros(C(2)+C(1)+1,1);   % ... and metrics
+        for V=-C(1):1:C(2)    % test search with dilated and eroded patterns
+            I = V+C(1)+1;  % indexing
+            if V==0; continue; end % skip original-size shifted pattern
+            [dpPos(I,:),dpMet(I),~] = ... % run the bloody expensive searches
+                TrackPipette( vidObj, dilPipette(I).frame, lastPosition()-[V,V], thisFrame);  % search dilated pipette in the box
         end
         
-        [dpPos,dpMet] = TrackPipette( vidObj, dilPipette, lastPosition()-[C,C], thisFrame);  % search dilated pipette in the box
-            
-        if dpMet > maxscore     % improvement
-            index              = dpPos + [C,C];
+        [metMax,metInd] = max(dpMet);   % get the value and index of maximal match
+        
+        if metMax > maxscore     % improvement
+            warning(strjoin({'At frame %d, the corrective measure increased metric from the value',...
+                '%.6f to %.6f with the pattern changed by %d pixels'}),...
+                thisFrame, maxscore, metMax, metInd-C(1)-1);
+            index              = dpPos(metInd,:) + [metInd-C(1)-1,metInd-C(1)-1] + wfShift;
             position(frames,:) = index;
-            scores(frames,:)   = dpMet;
-            maxscore           = dpMet;
+            scores(frames,:)   = metMax;
+            maxscore           = metMax;
             metricTest = mean(scores(max(frames-review,1):frames,:));   % try if new metric passes the test
             improved = true;
+            
         else
             if frames-warnSev(2) >= 10;  % display warning at most every 10 frames
                 warning(strjoin({'At frame %d, the pipette correlation metric dropped to %.3f.',...
-                'The lowest threshold value is %.3f.'}), range(1)-1+frames, metricTest, robust(1) );
+                'The lowest threshold value is %.3f.'}), thisFrame, metricTest, robust(1) );
                 warnSev(2) = frames;
             end;    
             improved = false;

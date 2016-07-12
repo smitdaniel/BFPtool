@@ -70,13 +70,18 @@ classdef vidWrap < handle
                 obj.Width  = obj.vidObj.getTag('ImageWidth');
                 obj.Height = obj.vidObj.getTag('ImageLength');
                 frames = regexp(obj.vidObj.getTag('ImageDescription'),'\d*','match');
-                obj.Frames = str2double(frames{3});
+                if numel(frames) == 6
+                    obj.Frames = str2double(frames{3});
+                    obj.Framerate = round(str2double(strcat(frames{5},'.',frames{6})));
+                    obj.Duration = obj.Frames / obj.Framerate;
+                else    
+                    hdb = obj.getFramerate();
+                    uiwait(hdb);
+                end
+                
                 obj.vidObj.setDirectory(1);
                 obj.CurrentFrame = 1;
                 
-                % default values for now; will be modified by user
-                obj.Duration  = obj.Frames;
-                obj.Framerate = 1;
                 
             else    % if file is not TIFF
                 obj.istiff = false;
@@ -329,40 +334,51 @@ classdef vidWrap < handle
         function db = getFramerate(obj)
             inputype = 1;
             inputval = -1;
-            boxstr = 'input value';
-            db = dialog('Units','normalized','Position',[0.25 0.25 0.5 0.5], 'Name',...
+            obj.vidObj.setDirectory(1);
+            while(~obj.vidObj.lastDirectory)    % read until last dir.
+                obj.vidObj.nextDirectory;
+            end
+            obj.Frames = obj.vidObj.currentDirectory;   % set # of frames
+            frmval = obj.Frames;
+            boxstr = '<input value>';
+            frmstr = num2str(frmval);
+            db = dialog('Units','pixels','Position',[0 0 640 480], 'Name',...
                 'No timestamps in TIFF file', 'WindowStyle', 'modal', 'CloseRequestFcn',@closedb_callback,...
-                'Resize','on');
+                'Resize','off', 'Visible','off');
+            movegui(db,'center');
+            db.Visible='on';
             txt = uicontrol('Parent', db, 'Style', 'text', 'Units', 'normalized',...
-                'Position', [0.1 0.6 0.8 0.4], 'String', strjoin({'The TIFF file imported does not',...
+                'Position', [0.1 0.6 0.8 0.3], 'String', strjoin({'The TIFF file imported does not',...
                 'contain information about the time length of the video or its framerate. Please provide,'...
                 'the information below. If You cannot acquire such information, please make a calibration',...
-                'of You own choice.'}),'HorizontalAlignment','left');
-            bg = uibuttongroup('Parent', db, 'Units', 'normalized', 'Position', [0.1 0.3 0.8 0.3],...
+                'of You own choice. You can also limit the number of frames to be read by the application.'}),...
+                'HorizontalAlignment','left');
+            bg = uibuttongroup('Parent', db, 'Units', 'normalized', 'Position', [0.1 0.3 0.8 0.2],...
                 'SelectionChangedFcn', {@rb_callback});
             rFR= uicontrol('Parent',bg, 'Style', 'radiobutton', 'String', 'Framerate [FPS]',...
-                'Units','normalized', 'Position', [0.1 0.5 0.8 0.5], 'Value', 1);
+                'Units','normalized', 'Position', [0.1 0.5 0.4 0.5], 'Value', 1);
             rTD= uicontrol('Parent',bg, 'Style', 'radiobutton', 'String', 'Time duration [s]',...
-                'Units', 'normalized', 'Position', [0.1 0 0.8 0.5], 'Value', 0);
+                'Units', 'normalized', 'Position', [0.1 0 0.4 0.5], 'Value', 0);
             bg.SelectedObject = rFR;
+            sharebox = uicontrol('Parent',bg,'Style','edit','String',boxstr,...
+                'Units','normalized','Position', [0.5 0.5 0.3 0.5],'Callback',{@read_callback,boxstr});
+            
             inputxt = uicontrol('Parent',db,'Style','text','Units','normalized',...
-                'Position', [0 0.1 0.3 0.2], 'String', 'Framerate:');
-            inputbox = uicontrol('Parent',db,'Style','edit','String',boxstr,...
-                'Units','normalized','Position', [0.3 0.1 0.3 0.2],'Callback',{@read_callback,boxstr});
+                'Position', [0 0.1 0.3 0.1], 'String', strcat('Frames (max.',num2str(frmstr),'):'));
+            inputbox = uicontrol('Parent',db,'Style','edit','String',frmstr,'Tag','frm',...
+                'Units','normalized','Position', [0.3 0.1 0.3 0.2],'Callback',{@read_callback,frmstr});
             sendbtn = uicontrol('Parent',db,'Style','pushbutton','String','Send','Enable','off',...
                 'Units','normalized','Position', [0.6 0.1 0.3 0.2], 'Callback',  @send_callback);
-            set([txt,bg,rFR,rTD,inputxt,inputbox,sendbtn], 'FontUnits', 'normalized');
+            set([txt,bg,rFR,rTD,inputxt,inputbox,sendbtn], 'FontUnits', 'pixels','FontSize',14);
             
             % radio buttons to switch between framerate and duration
             function rb_callback(~,data)
                 if data.NewValue == rFR
-                    inputxt.String = 'Framerate [FPS]:';
                     inputype= 1;
-                    sendbtn.Enable = 'on';
+                    sharebox.Position = [0.5 0.5 0.3 0.5];
                 else
-                    inputxt.String = 'Duration [s]:';
                     inputype= 2;
-                    sendbtn.Enable = 'on';
+                    sharebox.Position = [0.5 0 0.3 0.5];
                 end
             end
             
@@ -370,9 +386,23 @@ classdef vidWrap < handle
             function read_callback(src,~,oldval)
                 val = str2double(src.String);
                 if ~isnan(val) && (val>0)
-                    inputval = val;
+                    if strcmp(src.Tag,'frm')
+                        val = round(val);
+                        if val > obj.Frames
+                            src.String=oldval;                            
+                            warndlg(strcat('Input must be a positive number of type double, <',num2str(obj.Frames+1)),...
+                                'Incorrect input', 'replace');
+                            return;
+                        end
+                        frmval = val;   % # of frames
+                    else
+                        inputval = val; % duration or fps
+                    end
                     src.Callback = {@read_callback,num2str(val)};
-                    sendbtn.Enable = 'on';
+                    src.String = val; % modifie to interger, if frame #
+                    if (inputval ~= -1 && frmval ~= -1)
+                        sendbtn.Enable = 'on';  % if both values provided, enable send btn
+                    end
                 else
                     src.String = oldval;
                     warndlg('Input must be a positive number of type double','Incorrect input', 'replace');
@@ -385,17 +415,25 @@ classdef vidWrap < handle
                 if inputype == 1    % case of framerate
                     if ~isnan(inputval) && (inputval > 0)
                         obj.Framerate = inputval;
+                        obj.Frames = frmval;
                         obj.Duration = obj.Frames/obj.Framerate; % duration in seconds
                     else
                         warndlg('Input must be a positive number of type double','Incorrect input', 'replace');
+                        sharebox.String = '<input value>';
+                        inputval = -1;
+                        sendbtn.Enable = 'off';
                         return;
                     end
                 else
                     if ~isnan(inputval) && (inputval > 0)
                         obj.Duration = inputval;
+                        obj.Frames = frmval;
                         obj.Framerate = obj.Frames/obj.Duration; % framerate in FPS
                     else
                         warndlg('Input must be a positive number of type double','Incorrect input', 'replace');
+                        sharebox.String = '<input value>';
+                        inputval = -1;
+                        sendbtn.Enable = 'off';
                         return;
                     end
                 end
@@ -404,10 +442,13 @@ classdef vidWrap < handle
             
             % attempt to close the dialog prematurely
             function closedb_callback(~,~)
-                choice = questdlg(strcat('No input was passed. Failsafe values will be used -- framerate of 1 FPS.',...
+                choice = questdlg(strcat('No input was passed.',...
+                    'Failsafe values will be used -- framerate of 1 FPS.',...
                     'Do You want to close this window anyway?'),'No framerate information','Yes','No','No');
                 switch choice
                     case 'Yes'
+                        obj.Framerate = 1;
+                        obj.Duration = obj.Frames/obj.Framerate;    % set time in s
                         db.delete;  % delete dialog box
                     case 'No'
                         return;     % keep open and return

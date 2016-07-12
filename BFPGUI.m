@@ -30,7 +30,8 @@ function [ backdoorObj ] = BFPGUI( varargin )
         helpstr=[]; % delete string if nothing found
     end
     if ~isempty(helpstr)
-        addpath(helpstr);  % add path to html folder
+        if strfind(path,helpstr); rmpath(helpstr); end % remove from path if already there
+        addpath(helpstr);  % add path to html folder; will be parsed by the Documentation
     end
 
 %% Importing data
@@ -84,6 +85,7 @@ handles.beadlist = [];      % the list of inicial coordinates of beads for track
 handles.beadradius = [8,18];    % limits on radius of the bead
 handles.beadbuffer = 5;         % limit on grace period if bead cannot be detected (in frames)
 handles.pipbuffer = 5;          % limit on grace period if pipette pattern can't be detected (in frames)
+handles.dilate = [2,2];         % erode/dilate parameters
 handles.beadsensitivity = 0.8;  % circle finding method sensitivity
 handles.beadgradient = 0.2;     % circle finding method gradient threshold
 handles.beadmetricthresh = 0.8; % circle finding method metric threshold
@@ -149,7 +151,7 @@ GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
             'hPIPrad','hCArad','hP2M', 'hvidheight', 'hvidwidth',...
             'hvidduration','hvidframes','hvidframerate','hvidname','hvidformat',...
             'hlowplot','hhighplot','hgetplatwidth','hplatwidth','hgetplatthresh','hplatthresh',...
-            'hgetplatmin','hplatmin','hfitint', };
+            'hgetplatmin','hplatmin','hfitint','herode','hdilate' };
         
 GUIflags.Values = {'hmoviebar', 'hpatternlist', 'hcorrthresh','hcontrasthresh', 'hbeadinilist',...
             'hsensitivitybar', 'hgradbar', 'hmetric','hgraphbead','hgraphpip','hverbose','hhideexp',...
@@ -178,7 +180,7 @@ GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ..
             'tmppatframe', 'interval', 'intervallist', 'remove', 'updpatframe',...
             'calibint', 'lowplot', 'highplot', 'toPlot', 'thisPlot', 'thisRange',...
             'fitInt', 'kernelWidth', 'noiseThresh', 'minLength', 'hzeroline',...
-            'pushtxt', 'pulltxt', 'contype', 'calibrated' };
+            'pushtxt', 'pulltxt', 'contype', 'calibrated', 'dilate' };
         
         
 %% ================= SETTING UP GUI CONTROLS =========================
@@ -317,7 +319,14 @@ handles.hpipbufftxt     = uicontrol('Parent',handles.hpipdetection, 'Style', 'te
             'Units','normalized','Position', [0,0.4,0.5,0.2]);        
 handles.hpipbuffer      = uicontrol('Parent',handles.hpipdetection', 'Style', 'edit', 'String', num2str(handles.pipbuffer),...
             'Units','normalized','Position',[0.5,0.4,0.5,0.2],'Callback',{@pipbuffer_callback});   
-set([handles.hpipbufftxt,handles.hpipbuffer],'FontUnits','normalized');        
+handles.hdilatetxt      = uicontrol('Parent',handles.hpipdetection, 'Style', 'text', 'String', {'Erode'; 'Dilate'},...
+            'TooltipString', 'Number of pixels for erosion/dilatation of pipette pattern',...
+            'Units','normalized','Position', [0,0.2,0.5,0.2]);
+handles.herode          = uicontrol('Parent',handles.hpipdetection', 'Style', 'edit', 'String', num2str(handles.dilate(1)),...
+            'Units','normalized','Position',[0.5,0.2,0.25,0.2],'Callback',{@dilate_callback}); 
+handles.hdilate         = uicontrol('Parent',handles.hpipdetection', 'Style', 'edit', 'String', num2str(handles.dilate(2)),...
+            'Units','normalized','Position',[0.75,0.2,0.25,0.2],'Callback',{@dilate_callback}); 
+set([handles.hpipbufftxt,handles.hpipbuffer,handles.hdilatetxt],'FontUnits','normalized');        
 % ====================================================================
 
 %% ================= BEAD DETECTION SETTINGS ==========================
@@ -1616,7 +1625,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     function update_callback(~,~)
         BFPobj = BFPClass(vidObj.Name, vidObj ,handles.intervallist);
         BFPobj.getBeadParameters(handles.beadradius,handles.beadbuffer,handles.beadsensitivity,handles.beadgradient,handles.beadmetricthresh,handles.P2M);
-        BFPobj.getPipParameters(handles.pipmetricthresh, handles.contrasthresh, handles.pipbuffer);
+        BFPobj.getPipParameters(handles.pipmetricthresh, handles.contrasthresh, handles.pipbuffer, handles.dilate);
         set([handles.hruntrack,handles.hgenfilm],'Enable','on');        
     end
 
@@ -2327,6 +2336,24 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         source.Callback = {@setexpdata_callback,input};
     end
 
+%% Pipette erode/dilate parameters
+    % sets number of pixels to erode of dilate the pipette pattern to retry
+    % detection and improve metrics. Note this is very constly and works
+    % only for lower correlations (efficiently), there is can make a 10 %
+    % difference
+    function dilate_callback(~,~)
+        erode  = round(str2double(handles.herode.String)); % intergers required (full pixels)
+        dilate = round(str2double(handles.hdilate.String));
+        if (isnan(erode) || isnan(dilate) || erode < 0 || dilate < 0 )     % abort if input is incorrect
+            warndlg('Input must be a non-negative number of type double', 'Incorrect input', 'replace');
+            handles.herode.String = num2str(handles.dilate(1));
+            handles.hdilate.String = num2str(handles.dilate(2));
+            return;
+        end
+        handles.dilate(1) = erode;
+        handles.dilate(2) = dilate;
+    end
+
 %% Pipette buffer
     % set pipette tracking grace period
     function pipbuffer_callback(source,~)
@@ -2522,12 +2549,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         else
             handles.selecting = true;
         end
-            
-        vidObj.CurrentFrame
         
         [handles.bead,pass,~] = getBead(source,srctag);  % call method to detect bead
-        
-        handles.bead.frame
         
         % if detection fails (reject or error), old 'handles.bead' value is returned
         % if old value is empty, stop here, do not change anything
@@ -2857,12 +2880,12 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             % user cancels the dialog or does something unexpected, the try
             % fails and the video doesn't open at all
             if ~isempty(vidObj) || newOpenned     % a new object was successfully created
-                if vidObj.istiff    % from a TIFF file
-                    hfrd = vidObj.getFramerate();   % querry to obtain FR
-                    uiwait(hfrd);
-                    handles.hvidframerate.String = strcat('Framerate: ',num2str(vidObj.Framerate), ' fps');
-                    handles.hvidduration.String = strcat('Duration: ',num2str(vidObj.Duration),' s');
-                end
+               % if vidObj.istiff    % from a TIFF file
+               %     hfrd = vidObj.getFramerate();   % querry to obtain FR
+               %     uiwait(hfrd);
+               %     handles.hvidframerate.String = strcat('Framerate: ',num2str(vidObj.Framerate), ' fps');
+               %     handles.hvidduration.String = strcat('Duration: ',num2str(vidObj.Duration),' s');
+               % end
             end
         end
     end
@@ -3130,10 +3153,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hvidframes.String = strcat('Frames: ',num2str(vidObj.Frames));
         handles.hvidname.String = strcat('Name: ', vidObj.Name);
         handles.hvidformat.String = strcat('Format: ', vidObj.Format);
-        if ~vidObj.istiff
-            handles.hvidframerate.String = strcat('Framerate: ',num2str(vidObj.Framerate), ' fps');
-            handles.hvidduration.String = strcat('Duration: ',num2str(vidObj.Duration),' s');
-        end
+        handles.hvidframerate.String = strcat('Framerate: ',num2str(vidObj.Framerate), ' fps');
+        handles.hvidduration.String = strcat('Duration: ',num2str(vidObj.Duration),' s');
     end
 
 %% Copy strcture   

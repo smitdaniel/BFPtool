@@ -66,6 +66,7 @@ classdef BFPClass < handle
         correlation;    % correlation coefficient threshold
         contrast;       % contrast threshold
         pipbuffer;      % max. frames of failed matching in a row
+        dilate;         % [erode, dilate] parameters, in pixels
         
         % errors of measurement (should be editable)
         DP = 10;    % implicit error of pressure measurement, 10 Pa
@@ -140,10 +141,11 @@ classdef BFPClass < handle
         end
         
         % set up settings for pipette tracking; read from GUI
-        function getPipParameters(obj,correlation,contrast,buffer)
+        function getPipParameters(obj,correlation,contrast,buffer,dilate)
             obj.correlation = correlation;
             obj.contrast    = contrast;
             obj.pipbuffer   = buffer;
+            obj.dilate      = dilate;
         end
         
         %% Tracking function
@@ -182,7 +184,7 @@ classdef BFPClass < handle
                                             TrackPipette( obj.vidObj, obj.intervallist(int).pattern,...
                                             obj.intervallist(int).patcoor,obj.intervallist(int).frames,...
                                             'robustness',obj.correlation, 'quality', obj.contrast,...
-                                            'buffer', obj.pipbuffer, 'waitbar', htrackbar);
+                                            'buffer', obj.pipbuffer, 'waitbar', htrackbar, 'dilate', obj.dilate);
                 if htrackbar.UserData.failure;  % orderly skipping of the interval in case of failure
                     failcontinue(int,true); 
                     continue;
