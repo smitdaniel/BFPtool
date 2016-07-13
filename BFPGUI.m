@@ -8,14 +8,17 @@
 %   backdoorObj: is a handle superclass object, which is connected to some of
 %   the important parameters within the BFPClass and BFPGUI. It allows user
 %   to change these parameters from the Matlab command line. It is usually
-%   not necessary to access these paremeters.
+%   not necessary to access these paremeters. (not passed bus assigned to
+%   the base workspace)
+%   hfig: handle to the main GUI figure
 %   *IN:*
 %   loadData (Optional): allows user to start GUI instance with data 
 %   imported from an older MAT file form earlier session or another machine
 %   ======================================================================
 
-function [ backdoorObj ] = BFPGUI( varargin )
+function [ hfig ] = BFPGUI( varargin )
 %% Add help path into Matlab path
+% if already present, remove and add the path again to have it parsed
     [apppath,~,~] = fileparts(mfilename('fullpath')); % path to the current M-file (BFPGUI.m)
     apphtmls = numel(strfind(apppath,'html'));    % find possible html strings in app path (would usually be 0)
     allpath=genpath(apppath);   % get all the subfolders below BFPGUI folder (avoid direct path manipulation because of platform problems)
@@ -66,6 +69,7 @@ handles.fontsize = 0;  % absolute size in pixels, if necessary
 
 % create backdoor object to modify hidden parameters
 backdoorObj = BFPGUIbackdoor(@backdoorFunction);
+assignin('base','BackDoor',backdoorObj);    % assign a handle to the 'base'
 
 % turn off LibTIFF warnings
 warning('off','MATLAB:imagesci:tiffmexutils:libtiffWarning');
@@ -151,7 +155,7 @@ GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
             'hPIPrad','hCArad','hP2M', 'hvidheight', 'hvidwidth',...
             'hvidduration','hvidframes','hvidframerate','hvidname','hvidformat',...
             'hlowplot','hhighplot','hgetplatwidth','hplatwidth','hgetplatthresh','hplatthresh',...
-            'hgetplatmin','hplatmin','hfitint','herode','hdilate' };
+            'hgetplatmin','hplatmin','hfitint','herode','hdilate','hreframeedt', 'hreframebtn' };
         
 GUIflags.Values = {'hmoviebar', 'hpatternlist', 'hcorrthresh','hcontrasthresh', 'hbeadinilist',...
             'hsensitivitybar', 'hgradbar', 'hmetric','hgraphbead','hgraphpip','hverbose','hhideexp',...
@@ -164,10 +168,11 @@ GUIflags.Enables = {'hmoviebar', 'hplaybutton', 'hrewindbtn', 'hffwdbutton', ...
             'hupdate','hruntrack','hrunforce','hgraphplot','hgraphitem','hgraphbead',...
             'hgraphpip','hlowplot','hhighplot','hreport','hlinearinfo','hfitline',...
             'hfitexp','hfitplateau','hplatwidth','hplatthresh','hplatmin','hexport',...
-            'himport'};
+            'himport','hreframebtn'};
 
 GUIflags.Visibles = {'hpatterns', 'hbeadmethods', 'hpipdetection','hbeaddetection',...
-            'hexpdata','hgetplatwidth','hgetplatthresh','hgetplatmin'};
+            'hexpdata','hgetplatwidth','hgetplatthresh','hgetplatmin','hreframeedt',...
+            'hreframebtn'};
         
 %% List of GUI variables, mutables
 GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ...
@@ -196,6 +201,7 @@ handles.hmoviebar = uicontrol('Parent',handles.hfig, 'Style', 'slider', 'Max', 1
              'Units', 'normalized', 'Enable', 'off',...
              'SliderStep', [0.01, 1], 'Position', [0.05, 0.005, 0.5, 0.015],...
              'Callback', {@videoslider_callback});
+hfig = handles.hfig;    % handle to the GUI returned by the app call
 % =================================================================== 
 
 %% ================= OPENNING A VIDEO FILE ===========================
@@ -477,24 +483,30 @@ set([handles.hpressure,handles.hRBCrad,handles.hPIPrad,handles.hCArad,handles.hP
 
 %% ================= VIDEO INFORMATION ================================
 % only information about the video; read only fields
-handles.hvidinfo = uipanel('Parent', handles.hfig,'Title','Video information', 'Units','normalized',...
+handles.hvidinfo    = uipanel('Parent', handles.hfig,'Title','Video information', 'Units','normalized',...
             'Position', [0.05, 0.86, 0.25, 0.1]);
-handles.hvidheight = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
+handles.hreframebtn = uicontrol('Parent', handles.hvidinfo, 'Style', 'pushbutton', 'String', 'Reframerate',...
+            'Units','normalized', 'Position', [0.5,0.75,0.5,0.25],'Callback',{@reframe_callback,'btn'},...
+            'Enable','off', 'TooltipString','Click to change video framerate','Visible','on');
+handles.hreframeedt = uicontrol('Parent', handles.hvidinfo, 'Style', 'edit', 'String', [],...
+            'Units','normalized', 'Position', [0.5,0.75,0.5,0.25],'Callback',{@reframe_callback,'data'},...
+            'Visible','off','TooltipString','Input new framerate value');
+handles.hvidheight  = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
             'HorizontalAlignment','left','String', 'Height:', 'Position', [0,0.75,0.5,0.25]);
-handles.hvidwidth = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
+handles.hvidwidth   = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
             'HorizontalAlignment','left','String', 'Width:', 'Position', [0,0.5,0.5,0.25]);
-handles.hvidduration = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
+handles.hvidduration= uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
             'HorizontalAlignment','left','String', 'Duration:', 'Position', [0,0.25,0.5,0.25]);
-handles.hvidframes = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
+handles.hvidframes  = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
             'HorizontalAlignment','left','String', 'Frames:', 'Position', [0,0,0.5,0.25]);
 handles.hvidframerate = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
             'HorizontalAlignment','left','String', 'Framerate:', 'Position', [0.5,0,0.5,0.25]);
-handles.hvidname = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
+handles.hvidname    = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
             'HorizontalAlignment','left','String', 'Name:', 'Position', [0.5,0.25,0.5,0.25]);
-handles.hvidformat = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
+handles.hvidformat  = uicontrol('Parent', handles.hvidinfo, 'Style', 'text', 'Units', 'normalized',...
             'HorizontalAlignment','left','String', 'Format:', 'Position', [0.5,0.5,0.5,0.25]);  
 set([handles.hvidheight,handles.hvidwidth,handles.hvidduration,handles.hvidframes,handles.hvidframerate,...
-    handles.hvidname,handles.hvidformat],'FontUnits','normalized');        
+    handles.hvidname,handles.hvidformat,handles.hreframebtn,handles.hreframeedt],'FontUnits','normalized');        
 % ====================================================================
 
 %% ================= RUNNING CALCULATION ==============================
@@ -601,7 +613,7 @@ set([handles.hfitline,handles.hfitexp,handles.hfitplateau,handles.hgetplatwidth,
 handles.hio      = uipanel('Parent',handles.hfig,'Title','Import, export, UI settings', 'Units','normalized',...
             'Position', [0.31,0.66,0.14,0.30]);
 handles.hvar     = uicontrol('Parent', handles.hio, 'Style', 'popupmenu', 'Units', 'normalized', 'String',...
-            {'force & tracks'; 'frame'; 'graph'; 'parameters'}, 'Enable', 'on', 'Position',...
+            {'force & tracks'; 'frame'; 'graph'; 'session'}, 'Enable', 'on', 'Position',...
             [0,0.9,1,0.1], 'Callback', {@port_callback});
 handles.htar     = uicontrol('Parent', handles.hio, 'Style', 'popupmenu', 'Units', 'normalized', 'String',...
             {'workspace'; 'data file'; 'figure/media'}, 'Enable', 'on', 'Position',...
@@ -704,7 +716,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %% Import function
     % controls various import possibilities
     function import_callback(~,~)
-        var = handles.hvar.Value;       % which variable is to be imported; 1=force & track, 2=frame, 3=graph, 4=parameters
+        var = handles.hvar.Value;       % which variable is to be imported; 1=force & track, 2=frame, 3=graph, 4=session
         src = handles.htar.Value;       % target of the import; 1=workspace, 2=datafile, 3=figure
         
         if isempty(BFPobj)          % BFPobj was not yet instantiated
@@ -744,6 +756,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                         case 'Bead track'     
                             importFeed('beadPositions');
                             handles.hgraphbead.Enable = 'on';
+                        otherwise % (X) option
+                            return;
                     end
                             
                 elseif tar==3;   % figure/image - no action
@@ -783,10 +797,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     delete(importfig);
                 end
                 
-            case 4  % parameters
+            case 4  % session
                 if src==1       % workspace - no action
                 elseif src==2   % datafile (here .mat file)
-                    fileName = getFileName('BFPparameters.mat');
+                    fileName = getFileName('BFPsession.mat');
                     loadEnvironment(fileName);
                     assignin('base','BFPbackdoor',backdoorObj); % send the new backdoor to the base WS
                 elseif src==3   % figure/image - no action
@@ -798,7 +812,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %% Export function
     % controls various combinations of figure elements and targets of export
     function export_callback(~,~)
-        var = handles.hvar.Value;       % which variable is to be exported; 1=force & track, 2=frame, 3=graph, 4=parameters
+        var = handles.hvar.Value;       % which variable is to be exported; 1=force & track, 2=frame, 3=graph, 4=session
         tar = handles.htar.Value;       % target of the export; 1=workspace, 2=datafile, 3=figure
         
         switch var
@@ -958,10 +972,10 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     delete(htempfig);
                 end
                 
-            case 4  % parameters
+            case 4  % session
                 if tar==1       % workspace - no action
                 elseif tar==2   % datafile (here .mat file)
-                    fileName = putFileName('BFPparameters.mat');
+                    fileName = putFileName('BFPsession.mat');
                     if isequal(fileName,0); return; end;    % return if cancelled
                     saveEnvironment(fileName);     % saves the whole workspace (all variables) to the file
                 elseif tar==3   % figure/image - no action
@@ -1024,13 +1038,13 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                         handles.hexport.Enable = 'on';
                         handles.himport.Enable = 'on';  % figure only
                 end
-            case 4  % parameters
+            case 4  % session
                 switch tar
                     case 1  % workspace
                         handles.hexport.Enable = 'off';
                         handles.himport.Enable = 'off';
                         if handles.verbose;
-                            helpdlg('Export and import of parameters between workspaces is currently not possible.',...
+                            helpdlg('Export and import of session between workspaces is currently not possible.',...
                                     'Unsupported import/export');
                         end
                     case 2  % datafile
@@ -1040,7 +1054,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                         handles.hexport.Enable = 'off';
                         handles.himport.Enable = 'off';
                         if handles.verbose; 
-                            helpdlg('Export of parameters into figure and visa versa is not possible.', 'Unsupported export/import');
+                            helpdlg('Export of session into figure and visa versa is not possible.', 'Unsupported export/import');
                         end;
                 end
         end        
@@ -1131,7 +1145,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             choice = questdlg(['The fitting procedure is available only for force, contrast, metrics and imported outer graph',...
                     'Would You like to switch graph?'],'Data fitting','Force','Contrast','Metrics', 'Force');
             switch choice
-                case 'Force'
+                case 'Force' 
                     handles.toPlot = 4;
                     handles.hgraphitem.Value = handles.toPlot;
                     graphplot_callback(0,0);
@@ -1143,7 +1157,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     handles.toPlot = 5;
                     handles.hgraphitem.Value = handles.toPlot;
                     graphplot_callback(0,0);
-                otherwise
+                otherwise % cancelled  
                     return;
             end
         end
@@ -1574,7 +1588,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     'values, to give an idea of force time dependence. If You want to have results properly',...
                     'calibrated for Your experiment, please review these values before the calculation.'}),...
                     'Parameters for force calculation', 'Review', 'Proceed', 'Review');
-                if strcmp(choice,'Review'); return; end;
+                if (strcmp(choice,'Review')||strcmp(choice,''));    % cancel means no action
+                    return;
+                end;
             end;
             handles.calibrated = false; % mark not calibrated and continue
         else
@@ -1687,7 +1703,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                     ';',num2str(handles.interval.frames(1)),']');
                     handles.tmppatframe;    % original frame of the pattern is kept, hidden;
                     handles.updpatframe = handles.interval.frames(1);   % but information about update is kept;
-                case 'Cancel'
+                case {'Cancel',''}  % catch here also cancellation
                     handles.interval.patcoor = [];
                     handles.interval.pattern = [];
                     handles.hpatternint.String = '[.,.;.]';
@@ -1835,7 +1851,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     case 'Use previous';    % reset to previously used values
                         handles.interval.reference  = rframe;
                         handles.interval.patsubcoor = ranchor;
-                    case 'Review'           % make corrections
+                    case {'Review',''}      % make corrections, catch also cancel btn
                         return;
                 end
             end
@@ -2012,7 +2028,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             'calculated force across the intervals. Changing the anchor for one of the intervals is possible,',...
             'but keep in mind the results from different intervals may not be mutually compatible.'}),...
             'Anchor change', 'Proceed', 'Cancel', 'Cancel');
-        if strcmp(choice, 'Cancel')
+        if (strcmp(choice, 'Cancel') || strcmp(choice,''))  % catch cancel btn
             return;
         end
         inPattern = handles.interval.pattern;   % input pattern
@@ -2077,7 +2093,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 case 'Update'
                     handles.hstartint.String = num2str(handles.beadlist(val).frame);
                     handles.interval.frames(1) = handles.beadlist(val).frame;
-                case 'Cancel'
+                case {'Cancel',''} % catch cancel (X) button
                     return;
                 case 'Select'
                     getpoint_callback(handles.hselectbead,0,'interval');
@@ -2289,6 +2305,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             RBCframe = round(vidObj.CurrentFrame);
             RBCcontrast = questdlg('Does the red blood cell appear bright or dark?',...
                                    'RBC contrast','bright','dark','bright');
+            assert(any(strcmp(RBCcontrast,{'bright','dark'})),...   % generate error
+                'RBC detection process cancelled by user during contrast polarity choice.');
             [RBCcoor,RBCradius_,RBCmet,~] = TrackBead(vidObj,RBCcontrast,RBCinicoor,[RBCframe,RBCframe],...
                                        'radius',[20,30], 'sensitivity',0.95,'edge',0.1);
             if ( RBCradius_==0 ) % nothing detected
@@ -2299,17 +2317,17 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 if RBCmet < handles.beadmetricthresh && handles.verbose
                     warn(strjoin({'The RBC was detected, but the strength of the detection',...
                         'is rather low, with',num2str(round(RBCmet,2)),'below the threshold of',...
-                        num2str(handles.beadmetricthresh),'Review, if the detection appears correct.'}));
+                        round(num2str(handles.beadmetricthresh),2),'Review, if the detection appears correct.'}));
                 end;
                 hRBCshow = viscircles(handles.haxes,[RBCcoor(2),RBCcoor(1)],RBCradius_);
                 found = questdlg('Was the RBC detected correctly?','Confirm RBC detection','Accept','Cancel','Accept');
-                if strcmp(found, 'Accept')
+                if strcmp(found, 'Accept')  % cancel and (X) are dropped
                     handles.RBCradius = RBCradius_*handles.P2M;
                     handles.hRBCrad.String = num2str(round(handles.RBCradius,2));
                 end
             end
-        catch
-            warn('interrupt');
+        catch EM
+            warn('interrupt',EM.message);
         end
         RBCpoint.delete;
         source.Callback = {@measureRBC_callback};   % restore callback
@@ -2654,6 +2672,28 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
     end
 
+%% Change video framerate
+    % user can change video framerat (though might not be a good idea)
+    function reframe_callback(source,~,type)
+       if strcmp(type,'btn')    % this is a button call requesting change
+            source.Visible = 'off';
+            handles.hreframeedt.Visible = 'on';
+       else % case of 'data' type - value of frmrate passed in
+           val = str2double(source.String);
+           if (isnan(val) || val <= 0)
+               warn('Input must be a positive value of type double.')
+               source.String = num2str(vidObj.Framerate);   % reset old value
+               return;
+           end
+           val = round(val,1);
+           vidObj.Framerate = val;
+           source.String = num2str(val);
+           vidObj.Duration = vidObj.Frames/vidObj.Framerate;
+           source.Visible = 'off';
+           handles.hreframebtn.Visible = 'on';
+           setvidinfo();
+       end        
+    end
 %% Settings for ouput video
     % sets frame rate of the output generated video
     function outvideo_callback(source,~,failsafe,var)
@@ -2697,7 +2737,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 'continue?'}),'Contrast analysis', 'Continue', 'Cancel', 'Continue');
             switch choice
                 case 'Continue' % continue with the analysis
-                case 'Cancel'
+                case {'Cancel',''}  % catch also (X)
                     return;     % cancel the analysis
             end
         end
@@ -2876,17 +2916,6 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     handles.hvideopath.String = handles.videopath;
                 end
             end
-            % this is run separately, to have fallback values in case the
-            % user cancels the dialog or does something unexpected, the try
-            % fails and the video doesn't open at all
-            if ~isempty(vidObj) || newOpenned     % a new object was successfully created
-               % if vidObj.istiff    % from a TIFF file
-               %     hfrd = vidObj.getFramerate();   % querry to obtain FR
-               %     uiwait(hfrd);
-               %     handles.hvidframerate.String = strcat('Framerate: ',num2str(vidObj.Framerate), ' fps');
-               %     handles.hvidduration.String = strcat('Duration: ',num2str(vidObj.Duration),' s');
-               % end
-            end
         end
     end
 
@@ -2965,6 +2994,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     if exist('hf','var'); hf.delete; end;
                 case 'Default'
                     patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
+                otherwise
+                    assert(false,'Pipette pattern selection cancelled by user during anchor choice.');
             end
 
             if strcmp(tag,'interval')
@@ -2975,8 +3006,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             end
             pass = true;
             
-        catch
-            warn('interrupt');
+        catch ME
+            warn('interrupt',ME.message);
             rectangle.delete;
             patinfo = handles.pattern;
             pass = false;
@@ -3045,6 +3076,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     beadinfo.contrast = 'dark';
             end;
             beadpoint.delete;
+            assert(any(strcmp(beadinfo.contrast,{'dark','bright'})),...
+                'Bead selection cancelled by user during contrast choice.');
             
             if strcmp(tag,'beadrad')      
                 defaultRad = [5,50];    % wide range to catch-all (nearly)
@@ -3077,13 +3110,13 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                 case 'Accept'   % precise the coordinate
                     beadinfo.coor = [coor(2), coor(1) ];
                     pass = true;
-                case 'Reject'
+                case {'Reject', ''} % catch also (X)
                     beadinfo = handles.bead;
                     pass = false;
             end;
             hcirc.delete;
-        catch
-            warn('interrupt');
+         catch ME
+            warn('interrupt', ME.message);
             beadpoint.delete;
             beadinfo = handles.bead;
             pass=false;
@@ -3155,6 +3188,15 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         handles.hvidformat.String = strcat('Format: ', vidObj.Format);
         handles.hvidframerate.String = strcat('Framerate: ',num2str(vidObj.Framerate), ' fps');
         handles.hvidduration.String = strcat('Duration: ',num2str(vidObj.Duration),' s');
+        handles.hreframeedt.String = vidObj.Framerate;
+        if vidObj.istiff;
+            handles.hreframebtn.Enable = 'on';
+            handles.hreframebtn.String = 'Reframerate';
+            handles.hreframebtn.TooltipString = 'Click to change framerate';
+        else
+            handles.hreframebtn.Enable = 'off';
+            handles.hreframebtn.String = 'TIFF only';
+        end
     end
 
 %% Copy strcture   
@@ -3687,8 +3729,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             case 'Quit and abort'
                 handles.calibint = [];  % clear calibration interval data
                 delete(gcf);
-            case 'Continue'
-                return
+            case {'Continue',''}    % catch also (X)
+                return;
         end
         
     end

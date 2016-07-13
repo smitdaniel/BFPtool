@@ -68,7 +68,7 @@ classdef BFPGUIbackdoor < handle
         function killDeadWaitbar(obj)
             obj.backdoorFunctionHandle('deadwaitbar');
         end
-        
+            
         % testing if 'base' WS is connected to GUI
         function [val] = getTest(obj)
             val = obj.backpassedVariable;

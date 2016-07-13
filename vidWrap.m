@@ -70,7 +70,8 @@ classdef vidWrap < handle
                 obj.Width  = obj.vidObj.getTag('ImageWidth');
                 obj.Height = obj.vidObj.getTag('ImageLength');
                 frames = regexp(obj.vidObj.getTag('ImageDescription'),'\d*','match');
-                if numel(frames) == 6
+                if (numel(frames) == 5 || numel(frames) == 6)
+                    if isempty(frames{6}); frames{6}=0; end;    % in case FPS is interger
                     obj.Frames = str2double(frames{3});
                     obj.Framerate = round(str2double(strcat(frames{5},'.',frames{6})));
                     obj.Duration = obj.Frames / obj.Framerate;
