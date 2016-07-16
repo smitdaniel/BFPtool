@@ -90,8 +90,8 @@ else
 end;
 framesToPass = range(2)-range(1)+1;     % number of frames to parse
 radius   = inp.Results.radius;
-radius(1)= max(radius(1),1);            % make sure lower bound is non-negative
-radius(2)= max(radius(1),radius(2));    % make sure r(2) >= r(1)
+radius(1)= round(max(radius(1),1));            % make sure lower bound is non-negative
+radius(2)= round(max(radius(1),radius(2)));    % make sure r(2) >= r(1); must be intergers
 buffer   = round(inp.Results.buffer);
 sensitivity = inp.Results.sensitivity;
 edge     = inp.Results.edge;
@@ -205,7 +205,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     centre = [ centre; centrePC ];  % [r,c] coordinates
     rad = [rad; radPC ];
     metric = [metric; metricPC ];
-
+    
     % select the strongest circle: select the closest bead,metric-weighted
     distance = [0, 0];  % [ index, distance]; initial 'index=0' signals failed detection
     for i=1:size(centre,1)              % go through detected centres
@@ -214,7 +214,7 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
         tmpMoved = metric(i) / tmpDist;
         if(tmpMoved > distance(2) && rad(i) >= radius(1) && rad(i) <= radius(2) ); distance = [i,tmpMoved]; end;   % choose the closest bead
     end;
-
+    
     if( distance(1) == 0 && failcounter < buffer )     % failed to detect anything -- 'buffer' consecutive failed detections allowed
         found = false;
         calls = 1;
@@ -244,7 +244,9 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
         centre = centre(distance(1),:); % keep only the closest circle, still in [x,y]
         rad = rad(distance(1),:);
         metric = metric(distance(1),:);
-        centre = [centre(2) + box(1,1) - 1, centre(1) + box(1,2) - 1];  % centre, in global [r,c] coordinates
+        if ~isRetry     % retry call works only locally; returns coordinate in the box
+            centre = [centre(2) + box(1,1) - 1, centre(1) + box(1,2) - 1];  % centre, in global [r,c] coordinates
+        end
     end;
 
     %% ==== calculate metric and contrast recent means ====
@@ -324,11 +326,11 @@ function [got] = retry(C)
     LP = lastPosition();
     thisFrame = range(1) - 1 + frames;
     [c,r,m] = TrackBead(vidObj,contrast,LP,[thisFrame,thisFrame],...
-        'radius', radius + [-C,+C], 'sensitivity', min(sensitivity+0.1*C,1),...
-        'edge', max(edge-0.1*C,0),'retries',0, 'retry', true);
+        'radius', max(radius + [-C,+C],1), 'sensitivity', min(sensitivity+0.1*C,1),...
+        'edge', max(edge-0.1*C,0),'retries',0, 'retry', true,'side',side + [2,2]*C);
     
     if m > 0             % if bead is found
-        centre = c;
+        centre = c - [2,2]*C;   % correct the box shift, before global coordinates calculated in the main run
         rad    = r;
         metric = m;
         got =  true;

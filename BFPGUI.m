@@ -343,9 +343,9 @@ handles.hbeaddetection = uibuttongroup('Parent', handles.hfig, 'Title', 'Bead de
 handles.hradtxt     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'pushbutton', 'String','<HTML><center>Radius range</HTML>',...
             'Units', 'normalized','Position', [0,0.8,0.5,0.2],'Callback',{@getradrange_callback,'beadrad'},'Enable','off');
 handles.hminrad     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'edit', 'String', num2str(handles.beadradius(1)),...
-            'Units', 'normalized','Position', [0.5,0.8,0.2,0.2],'Callback', {@setrad_callback});
+            'Units', 'normalized','Position', [0.5,0.8,0.2,0.2],'Callback', {@setrad_callback},'TooltipString','Input positive interger value');
 handles.hmaxrad     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'edit', 'String', num2str(handles.beadradius(2)),...
-            'Units', 'normalized','Position', [0.75,0.8,0.2,0.2],'Callback', {@setrad_callback});
+            'Units', 'normalized','Position', [0.75,0.8,0.2,0.2],'Callback', {@setrad_callback},'TooltipString','Input positive interger value');
 handles.hbuffertxt  = uicontrol('Parent', handles.hbeaddetection, 'Style', 'text', 'String', 'Buffer frames',...
                     'TooltipString', 'Number of frames allowed to pass without successful bead detection',...
                     'Units', 'normalized','Position', [0,0.6,0.5,0.2]);
@@ -2307,17 +2307,18 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                                    'RBC contrast','bright','dark','bright');
             assert(any(strcmp(RBCcontrast,{'bright','dark'})),...   % generate error
                 'RBC detection process cancelled by user during contrast polarity choice.');
+            radrange = [2,3.5]/handles.P2M;    % 2-3 microns radius in pixels
             [RBCcoor,RBCradius_,RBCmet,~] = TrackBead(vidObj,RBCcontrast,RBCinicoor,[RBCframe,RBCframe],...
-                                       'radius',[20,30], 'sensitivity',0.95,'edge',0.1);
+                                       'radius',radrange, 'sensitivity',0.95,'edge',0.1);
             if ( RBCradius_==0 ) % nothing detected
                 warn(strjoin({'The RBC detection failed, no valid result returned.',...
                         'Make sure the cell is well visible, with clear edge (if possible)',...
                         'in the frame of selection, and try again.'}));
             else
-                if RBCmet < handles.beadmetricthresh && handles.verbose
+                if RBCmet < handles.beadmetricthresh
                     warn(strjoin({'The RBC was detected, but the strength of the detection',...
                         'is rather low, with',num2str(round(RBCmet,2)),'below the threshold of',...
-                        round(num2str(handles.beadmetricthresh),2),'Review, if the detection appears correct.'}));
+                        num2str(round(handles.beadmetricthresh,2)),'Review, if the detection appears correct.'}));
                 end;
                 hRBCshow = viscircles(handles.haxes,[RBCcoor(2),RBCcoor(1)],RBCradius_);
                 found = questdlg('Was the RBC detected correctly?','Confirm RBC detection','Accept','Cancel','Accept');
@@ -2450,9 +2451,9 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             handles.selecting = false;
             return; 
         end;        
-        handles.hminrad.String = num2str(0.5*rad);              % set new radii
-        handles.hmaxrad.String = num2str(1.5*rad);
-        setrad_callback(0,0);
+        handles.hminrad.String = num2str(max(0.5*rad,1));   % set new radii >= 1
+        handles.hmaxrad.String = num2str(max(1.5*rad,1));
+        setrad_callback(0,0);       % takes care of rounding and validation
         handles.selecting = false;  % remove selection lock
  
     end
@@ -2460,16 +2461,18 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
 %% Set bead detection radius range
     % set limit on radius for the bead tracking; verify correct input
     function setrad_callback(~,~)
-        vmin = str2double(handles.hminrad.String);
-        vmax = str2double(handles.hmaxrad.String);
+        vmin = round(str2double(handles.hminrad.String));   % round values for further input
+        vmax = round(str2double(handles.hmaxrad.String));
         if (isnan(vmin) || isnan(vmax) || vmin < 0 || vmax < 0 )     % abort if input is incorrect
-            warndlg('Input must be a non-negative number of type double', 'Incorrect input', 'replace');
+            warndlg('Input must be a non-negative number of type double --- is rounded to an interger', 'Incorrect input', 'replace');
             handles.hminrad.String = num2str(handles.beadradius(1));
             handles.hmaxrad.String = num2str(handles.beadradius(2));
             return;
         end
         handles.beadradius(1) = vmin;
         handles.beadradius(2) = vmax;
+        handles.hminrad.String = num2str(vmin); % infindcircles takes intergers...
+        handles.hmaxrad.String = num2str(vmax); % ... display intergers to hint user
         if (handles.beadradius(1) > handles.beadradius(2))  % warn if input gives empty range
             warndlg('Lower bead radius limit is larger than the upper limit',...
                 'Empty radius range', 'replace');
@@ -3030,7 +3033,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         % create parser instance, if not present
         if isempty(inpar)            
             inpar = inputParser();
-            defaultAxHandle = handles.haxes;    % default axes are main figure axes            
+            defaultAxHandle = handles.haxes;        % default axes are main figure axes            
             defaultCallback = @getpoint_callback;   % to reset source cbk
             defaultFrame    = -1;   % no input, flag as -1 (any more elegant solution more than welcome)
 
