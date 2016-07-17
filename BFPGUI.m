@@ -16,7 +16,7 @@
 %   imported from an older MAT file form earlier session or another machine
 %   ======================================================================
 
-function [ hfig ] = BFPGUI( varargin )
+function [ hguifig ] = BFPGUI( varargin )
 %% Add help path into Matlab path
 % if already present, remove and add the path again to have it parsed
     [apppath,~,~] = fileparts(mfilename('fullpath')); % path to the current M-file (BFPGUI.m)
@@ -144,6 +144,7 @@ handles.pushtxt   = [];     % texthandle for a pushing region descriptor ...
 handles.pulltxt   = [];     % ... and the like for pulling region
 handles.contype   = 1;      % type of contrast metric to display (1=SD2, 2=rSD2; see documentation)
 handles.calibrated= false;  % flags if the calculated force is calibrated (before force calculation if always false)
+handles.anot      = [];     % handle to LaTeX annotation showing k and Dk
 
 %% Lists of UI handles for export/import; mutable handles
 GUIflags.Strings = {'hvideopath', 'hdispframe', 'hfrmrate', 'hsampling', ...
@@ -168,7 +169,7 @@ GUIflags.Enables = {'hmoviebar', 'hplaybutton', 'hrewindbtn', 'hffwdbutton', ...
             'hupdate','hruntrack','hrunforce','hgraphplot','hgraphitem','hgraphbead',...
             'hgraphpip','hlowplot','hhighplot','hreport','hlinearinfo','hfitline',...
             'hfitexp','hfitplateau','hplatwidth','hplatthresh','hplatmin','hexport',...
-            'himport','hreframebtn'};
+            'himport','hreframebtn','hstiffbtn'};
 
 GUIflags.Visibles = {'hpatterns', 'hbeadmethods', 'hpipdetection','hbeaddetection',...
             'hexpdata','hgetplatwidth','hgetplatthresh','hgetplatmin','hreframeedt',...
@@ -185,7 +186,7 @@ GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ..
             'tmppatframe', 'interval', 'intervallist', 'remove', 'updpatframe',...
             'calibint', 'lowplot', 'highplot', 'toPlot', 'thisPlot', 'thisRange',...
             'fitInt', 'kernelWidth', 'noiseThresh', 'minLength', 'hzeroline',...
-            'pushtxt', 'pulltxt', 'contype', 'calibrated', 'dilate' };
+            'pushtxt', 'pulltxt', 'contype', 'calibrated', 'dilate','anot' };
         
         
 %% ================= SETTING UP GUI CONTROLS =========================
@@ -201,7 +202,7 @@ handles.hmoviebar = uicontrol('Parent',handles.hfig, 'Style', 'slider', 'Max', 1
              'Units', 'normalized', 'Enable', 'off',...
              'SliderStep', [0.01, 1], 'Position', [0.05, 0.005, 0.5, 0.015],...
              'Callback', {@videoslider_callback});
-hfig = handles.hfig;    % handle to the GUI returned by the app call
+hguifig = handles.hfig;    % handle to the GUI returned by the app call
 % =================================================================== 
 
 %% ================= OPENNING A VIDEO FILE ===========================
@@ -2776,6 +2777,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         xlim(handles.hgraph,[handles.lowplot,handles.highplot]);    % avoid margins around the graph
         handles.thisRange = [handles.lowplot,handles.highplot];     % range of the current plot
         handles.thisPlot = 1;                       % currently plotted contrast flag
+        handles.toPlot = 1;                         % contrast to plot next
+        handles.hgraphitem.Value = handles.toPlot;
         handles.hgraphplot.Enable = 'on';           % allow plot button, contrast only
         set( handles.hlowplot,  'Enable','on', 'String', num2str(handles.lowplot)  );
         set( handles.hhighplot, 'Enable','on', 'String', num2str(handles.highplot) );        
@@ -3033,7 +3036,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         % create parser instance, if not present
         if isempty(inpar)            
             inpar = inputParser();
-            defaultAxHandle = handles.haxes;        % default axes are main figure axes            
+            defaultAxHandle = -1;        % default axes are main figure axes            
             defaultCallback = @getpoint_callback;   % to reset source cbk
             defaultFrame    = -1;   % no input, flag as -1 (any more elegant solution more than welcome)
 
@@ -3049,7 +3052,11 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
         source = inpar.Results.source;
         tag = inpar.Results.tag;
-        hax = inpar.Results.hax;
+        if inpar.Results.hax==-1;
+            hax = handles.haxes;
+        else
+            hax = inpar.Results.hax;
+        end
         cbk = inpar.Results.cbk;
         if inpar.Results.frm==-1;   % no input, use current frame
             frm = vidObj.CurrentFrame;
@@ -3102,7 +3109,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             end
                 
             if metric < handles.beadmetricthresh;   % warn for weak detection; use glob metric thresh
-                    warn(strjoin({'The bead metric is only',num2str(metric),...
+                    warn(strjoin({'The bead metric is only',num2str(round(metric,2)),...
                     'which is below the threshold',num2str(handles.beadmetricthresh),...
                     'and detection failures can occur.'}));
             end;
@@ -3455,14 +3462,14 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             warn('RBC stiffness information can be generated only after the force has been calculated');
             return;
         end;
-        persistent hanot;
-        if ~isempty(hanot);hanot.delete;end;
+        if ~isempty(handles.anot);handles.anot.delete;end;
         if handles.overLimit;colour = 'red'; else colour = 'blue';end
         strk = {strcat('$$ k = ', num2str(round(handles.stiffness)),' \frac{pN}{\mu m}$$'),...
                strcat('$$ \Delta k = \pm' , num2str(round(BFPobj.Dk)),' \frac{pN}{\mu m} $$')};
-        hanot = annotation( handles.hcalc, 'textbox', 'interpreter', 'latex', 'String', strk, ...
+        handles.anot = annotation( handles.hcalc, 'textbox', 'interpreter', 'latex', 'String', strk, ...
             'Units', 'normalized', 'Position', [0,0.67,0.5,0.15], 'Margin', 0, ...
-            'LineStyle','none','FitBoxToText','off','Color',colour,'FontUnits','normalized');
+            'LineStyle','none','FitBoxToText','off','Color',colour,'FontUnits','normalized',...
+            'FontSize',0.025);
     end
 
 %% Export the whole environment
@@ -3503,6 +3510,14 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         
         in = load(fileName);
         
+        if ~isfield(in,'outgoing'); % if import cancelled
+            return;
+        end;
+        
+        oldanot = handles.anot;
+        if ~isempty(handles.anot)
+            handles.anot.delete();
+        end
         oldvideopath = handles.videopath;
         oldvidobj = vidObj;     % [] if empty
         handles.videopath = in.outgoing.GUIdata.videopath;
@@ -3519,6 +3534,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             validFile = browsevideo_callback(); % attempt to browse and open the video
             if ~validFile   % no valid video provided
                 handles.videopath = oldvideopath;   % restore old videopath
+                handles.anot = oldanot;             % restope old annotation
                 return;                             % if import failed, return
             end
             hwd.delete;
@@ -3580,6 +3596,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         % generate stiffness annotation
         if ~isempty(BFPobj) && ~isempty(BFPobj.k); makeStiffAnot(); end;
 
+        graphplot_callback(0,0);
         
     end
 

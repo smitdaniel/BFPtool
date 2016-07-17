@@ -163,7 +163,7 @@ classdef vidWrap < handle
             if isempty(inp)
                 inp = inputParser;
                 defaultType     = 1;    % contrast SD2 code
-                defaultrVarWW   = obj.rollVarWidth; % default window width rSD2
+                defaultrVarWW   = -1;   % default window width rSD2 passed from the object
 
                 inp.addRequired('obj');
                 inp.addRequired('ffrm');    % initial requested frm
@@ -174,11 +174,16 @@ classdef vidWrap < handle
                 
             inp.parse(obj, ffrm, lfrm ,varargin{:});
 
+            if inp.Results.rVarWW==-1;
+                rVarWW = obj.rollVarWidth;
+            else
+                rVarWW = round(inp.Results.rVarWW);
+            end
             obj = inp.Results.obj;
             ffrm = round(inp.Results.ffrm);
             lfrm = round(inp.Results.lfrm);
             type = inp.Results.type;
-            rVarWW = round(inp.Results.rVarWW);
+            
             % ===========================================================
             
             if obj.rollVarWidth ~= rVarWW   % update rolling variance window width if needed

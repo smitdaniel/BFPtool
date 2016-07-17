@@ -291,9 +291,6 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) )  % w
                 
         % these methods fire up when problems occur; these are search in
         % the fill field and search using dilated/eroded pipette pattern
-        % TODO: dilate/erode should be made more addaptive, at the current
-        % implementation it is basically just erode (restricting the
-        % pattern)
         if( metricTest <= robust(2) && lastWF ~= frames)       % major drop in xcorr metric and no WF this turn
             wideFieldSearch(2);
             lastWF = frames;
@@ -396,7 +393,8 @@ end;
         % function is not used again, if reliable pattern location can't be
         % established in the frame.
         
-        if numel(C) ~= 2    % not an interval input
+        if numel(C) ~= 2 || ...     % not an interval input
+           maxscore > robust(2)     % single point detection strength is good (metric test is based on averaging) 
             return;
         end
         
