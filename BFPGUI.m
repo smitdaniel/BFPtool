@@ -16,7 +16,7 @@
 %   imported from an older MAT file form earlier session or another machine
 %   ======================================================================
 
-function [ hguifig ] = BFPGUI( varargin )
+function [ hfig ] = BFPGUI( varargin )
 %% Add help path into Matlab path
 % if already present, remove and add the path again to have it parsed
     [apppath,~,~] = fileparts(mfilename('fullpath')); % path to the current M-file (BFPGUI.m)
@@ -191,23 +191,23 @@ GUIdata = {'verbose', 'selecting', 'fitfontsize', 'labelfontsize', 'pattern', ..
         
 %% ================= SETTING UP GUI CONTROLS =========================
 % contans parameters for the figure, movie axes, graphing axes and film bar
-handles.hfig = figure('Name', 'Pattern tracking','Units', 'normalized', 'OuterPosition', [0,0,1,1], ...
+hfig = figure('Name', 'Pattern tracking','Units', 'normalized', 'OuterPosition', [0,0,1,1], ...
              'Visible', 'on', 'Selected', 'on','WindowScrollWheelFcn',{@mouseplay_callback},...
-             'PaperPositionMode', 'auto');
-handles.haxes = axes('Parent',handles.hfig,'Units', 'normalized', 'Position', axesposition,...
+             'PaperPositionMode', 'auto','DeleteFcn',{@deleteFigure_callback},...
+             'CloseRequestFcn',{@closeFigure_callback});
+handles.haxes = axes('Parent',hfig,'Units', 'normalized', 'Position', axesposition,...
              'Visible', 'on','FontUnits','normalized');
-handles.hgraph = axes('Parent',handles.hfig,'Units','normalized', 'Position', [0.6,0.6,0.35,0.35],...
+handles.hgraph = axes('Parent',hfig,'Units','normalized', 'Position', [0.6,0.6,0.35,0.35],...
              'ButtonDownFcn',{@getcursor_callback},'FontUnits','normalized');
-handles.hmoviebar = uicontrol('Parent',handles.hfig, 'Style', 'slider', 'Max', 1, 'Min', 0, 'Value', 0, ...
+handles.hmoviebar = uicontrol('Parent',hfig, 'Style', 'slider', 'Max', 1, 'Min', 0, 'Value', 0, ...
              'Units', 'normalized', 'Enable', 'off',...
              'SliderStep', [0.01, 1], 'Position', [0.05, 0.005, 0.5, 0.015],...
              'Callback', {@videoslider_callback});
-hguifig = handles.hfig;    % handle to the GUI returned by the app call
 % =================================================================== 
 
 %% ================= OPENNING A VIDEO FILE ===========================
 % set panel to open, browse and input video path
-handles.hopenvideo = uibuttongroup('Parent', handles.hfig, 'Title','Open a video', 'Position', [0.05, 0.56, 0.25, 0.075]);
+handles.hopenvideo = uibuttongroup('Parent', hfig, 'Title','Open a video', 'Position', [0.05, 0.56, 0.25, 0.075]);
 handles.hvideopath = uicontrol('Parent',handles.hopenvideo, 'Style', 'edit', ...
             'Units', 'normalized',...
             'String', handles.videopath, 'Position', [0, 0.5, 1, 0.5],...
@@ -224,7 +224,7 @@ set([handles.hvideobutton,handles.hvideobrowse,handles.hvideopath],'FontUnits','
 %% ================= WORKING WITH THE VIDEO ===========================
 % video control buttons like, Play, Stop, FFW, RWD, analyze contrast, go to
 % frame, generate film, sampling, output framerate etc.
-handles.husevideo   = uibuttongroup('Parent', handles.hfig, 'Title', 'Video commands', 'Units', 'normalized',...
+handles.husevideo   = uibuttongroup('Parent', hfig, 'Title', 'Video commands', 'Units', 'normalized',...
              'Position', [0.31, 0.56, 0.24, 0.1]);
 handles.hplaybutton = uicontrol('Parent', handles.husevideo,'Style','pushbutton', ...
              'Units', 'normalized', 'Position', [0.2,0.5,0.2,0.5],'FontUnits','normalized',...
@@ -266,7 +266,7 @@ set([handles.hdisptrack,handles.hframeratetxt,handles.hsamplingtxt,handles.hfrmr
 %% ================= PATTERN COLLECTION ===============================
 % set pipette tip pattern, create pattern list, add and remove from the
 % list, miniaxes to display a pattern, diplay pattern info
-handles.hpatterns = uibuttongroup('Parent', handles.hfig, 'Title', 'Pipette patterns', 'Units', 'normalized',...
+handles.hpatterns = uibuttongroup('Parent', hfig, 'Title', 'Pipette patterns', 'Units', 'normalized',...
             'Position', [0.56, 0.29, 0.1, 0.26],'Visible','off');
 handles.hpatternlist = uicontrol('Parent', handles.hpatterns, 'Style', 'popup', 'String', {'no data'}, 'Value', 1, ...
             'Units', 'normalized', 'Position', [0,0.8,1, 0.2], 'FontUnits','normalized','Callback', {@pickpattern_callback});
@@ -288,7 +288,7 @@ set([handles.haddpatternbtn,handles.hrmpatternbtn,handles.hrectbutton],'FontUnit
 %% ================= BEAD DETECTION METHODS ===========================
 % set bead detection methods, create bead list, select ini. coordinate,
 % add and remove items from the list
-handles.hbeadmethods = uipanel('Parent', handles.hfig, 'Title', 'Bead tracking', 'Units', 'normalized',...
+handles.hbeadmethods = uipanel('Parent', hfig, 'Title', 'Bead tracking', 'Units', 'normalized',...
             'Position', [0.56, 0.05, 0.1, 0.24],'Visible','off');
 handles.hbeadinilist = uicontrol('Parent', handles.hbeadmethods, 'Style', 'popup', 'String', {'no data'},'Value',1,...
             'Units', 'normalized', 'Position', [0,0.3,1, 0.25],'FontUnits','normalized', 'Callback', {@pickbead_callback});
@@ -307,7 +307,7 @@ set([handles.hpointbtn,handles.haddbeadbtn,handles.hrmbeadbtn], 'FontUnits','nor
 %% ================= PIPETTE DETECTION SETTINGS =======================
 % set pipette detection, correlation and contrast thresholds, failed frame
 % buffer
-handles.hpipdetection   = uibuttongroup('Parent', handles.hfig, 'Title', 'Pipette detection settings', 'Units', 'normalized',...
+handles.hpipdetection   = uibuttongroup('Parent', hfig, 'Title', 'Pipette detection settings', 'Units', 'normalized',...
             'Position', [0.66, 0.29, 0.1, 0.26],'Visible','off');   
 handles.hcorrthreshtxt  = uicontrol('Parent',handles.hpipdetection, 'Style', 'text', 'String', {'Correlation'; strjoin({'thresh:', num2str(handles.pipmetricthresh)})},...
             'TooltipString', 'Lower limit on cross correlation matching', 'Units','normalized',...
@@ -339,7 +339,7 @@ set([handles.hpipbufftxt,handles.hpipbuffer,handles.hdilatetxt],'FontUnits','nor
 %% ================= BEAD DETECTION SETTINGS ==========================
 % set pipette detection, radius range, edge and metric sensitivity, failed
 % frame buffer, metric threshold
-handles.hbeaddetection = uibuttongroup('Parent', handles.hfig, 'Title', 'Bead detection settings', 'Units', 'normalized',...
+handles.hbeaddetection = uibuttongroup('Parent', hfig, 'Title', 'Bead detection settings', 'Units', 'normalized',...
             'Position', [0.66, 0.05, 0.1, 0.24],'Visible','off');
 handles.hradtxt     = uicontrol('Parent', handles.hbeaddetection, 'Style', 'pushbutton', 'String','<HTML><center>Radius range</HTML>',...
             'Units', 'normalized','Position', [0,0.8,0.5,0.2],'Callback',{@getradrange_callback,'beadrad'},'Enable','off');
@@ -380,7 +380,7 @@ set([handles.hradtxt,handles.hminrad,handles.hmaxrad,handles.hbuffertxt, handles
 % of frames, initial bead position (from list or pick in frame), pipette
 % pattern (from list of pick in frame), show pattern, select anchor point
 % on the pattern, detect reference frame, add to interval
-handles.hintervals  = uitabgroup('Parent', handles.hfig, 'Units','normalized', 'Position', [0.05, 0.635, 0.25, 0.225]);
+handles.hintervals  = uitabgroup('Parent', hfig, 'Units','normalized', 'Position', [0.05, 0.635, 0.25, 0.225]);
 handles.hsetinterval  = uitab('Parent', handles.hintervals, 'Title', 'Set interval', 'Units', 'normalized');
 handles.hintervaltxt= uicontrol('Parent',handles.hsetinterval, 'Style', 'text', 'String', 'Interval:', ...
                       'TooltipString', 'Interval of interest for tracking, in frames',...
@@ -456,7 +456,7 @@ handles.heraseint     = uicontrol('Parent',handles.hlistinterval,'Style','pushbu
 %% ============== EXPERIMENTAL PARAMETERS =============================
 % set, by input or measurement, radii (RBC, contact, pipette), pressute,
 % pixel to micron ratio 
-handles.hexpdata = uibuttongroup('Parent', handles.hfig, 'Title','Experimental parameters', 'Units','normalized',...
+handles.hexpdata = uibuttongroup('Parent', hfig, 'Title','Experimental parameters', 'Units','normalized',...
             'Position', [0.86,0.05,0.1,0.5],'Visible','off');
 handles.hprestxt    = uicontrol('Parent', handles.hexpdata, 'Style', 'text', 'String', 'Pressure:',...
            'Units', 'normalized','Position', [0,0.6,0.5,0.12]);
@@ -484,7 +484,7 @@ set([handles.hpressure,handles.hRBCrad,handles.hPIPrad,handles.hCArad,handles.hP
 
 %% ================= VIDEO INFORMATION ================================
 % only information about the video; read only fields
-handles.hvidinfo    = uipanel('Parent', handles.hfig,'Title','Video information', 'Units','normalized',...
+handles.hvidinfo    = uipanel('Parent', hfig,'Title','Video information', 'Units','normalized',...
             'Position', [0.05, 0.86, 0.25, 0.1]);
 handles.hreframebtn = uicontrol('Parent', handles.hvidinfo, 'Style', 'pushbutton', 'String', 'Reframerate',...
             'Units','normalized', 'Position', [0.5,0.75,0.5,0.25],'Callback',{@reframe_callback,'btn'},...
@@ -513,7 +513,7 @@ set([handles.hvidheight,handles.hvidwidth,handles.hvidduration,handles.hvidframe
 %% ================= RUNNING CALCULATION ==============================
 % set calculation, buttons to create BFPClass object, run tracking, get
 % force, plotting interface, select contrast,
-handles.hcalc =     uipanel('Parent', handles.hfig, 'Title', 'Tracking', 'Units', 'normalized',...
+handles.hcalc =     uipanel('Parent', hfig, 'Title', 'Tracking', 'Units', 'normalized',...
                 'Position', [0.76,0.05,0.1,0.5]);
 handles.hupdate      =   uicontrol('Parent', handles.hcalc, 'Style','pushbutton','String', 'Update', 'Units', 'normalized',...
                 'TooltipString','Commit modifications of tracking settings',...
@@ -562,7 +562,7 @@ set([handles.hupdate,handles.hruntrack,handles.hrunforce,handles.hgraphplot,...
 %% ========================= BASIC FITTING ============================
 % set basic fitting, fit line, exponentiel, plateaux, set interval, set
 % plateaux detection parameters (plat width etc)
-handles.hfit        = uipanel('Parent',handles.hfig,'Title','Basic Fitting', 'Units','normalized',...
+handles.hfit        = uipanel('Parent',hfig,'Title','Basic Fitting', 'Units','normalized',...
                 'Position', [0.45,0.66,0.1,0.30]);
 handles.hfitline    = uicontrol('Parent',handles.hfit,'Style','pushbutton','String','<HTML><center>Fit<br>line</HTML>',...
                 'Units','normalized','Position',[0,0.85,1,0.15],'Enable','off',...
@@ -611,7 +611,7 @@ set([handles.hfitline,handles.hfitexp,handles.hfitplateau,handles.hgetplatwidth,
 
 %% ================= IMPORT,EXPORT,UI SETTINGS ============================
 % set IO setting, from-to fields, import-export buttons
-handles.hio      = uipanel('Parent',handles.hfig,'Title','Import, export, UI settings', 'Units','normalized',...
+handles.hio      = uipanel('Parent',hfig,'Title','Import, export, UI settings', 'Units','normalized',...
             'Position', [0.31,0.66,0.14,0.30]);
 handles.hvar     = uicontrol('Parent', handles.hio, 'Style', 'popupmenu', 'Units', 'normalized', 'String',...
             {'force & tracks'; 'frame'; 'graph'; 'session'}, 'Enable', 'on', 'Position',...
@@ -652,9 +652,36 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     if loadData; 
         loadEnvironment(loadData);
     end
-% ====================================================================
 
+%% ============ DELETE FIGURE CLEAN MEMORY ============================
+    % cleans memory after figure is deleted
+    % is figure handle is left in the base workspace and reused for the
+    % next function call, it all gets terribly messed up. Hope this settles
+    % it. Collateral damage
+    function deleteFigure_callback(~,~)
+        hfig.delete;
+        backdoorObj.delete;
+        evalin('base','clear ''all'' ');    % delete handles from the base
+        clear handles;        
+        clear hfig;
+    end
 
+    function closeFigure_callback(~,~)
+        choice = questdlg(strjoin({'Do You want to close the window?',...
+                'Note that after closing the window, the base workspace',...
+                'of Matlab is cleared (for technical reasons) including all',...
+                'previous data or data exported during the GUI session.'}),...
+                'Close figure request',...
+                'Yes','No','Yes'); 
+        switch choice, 
+            case 'Yes',
+                deleteFigure_callback(0,0);
+            case {'No',''}
+                return;
+        end        
+    end
+
+%% ====================================================================
 %% ================= CALLBACK FUNCTIONS ===============================
 %% Change font size figurewide
     % changes font size to user specified input; input > 1 uses pixel
@@ -689,7 +716,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % mouse wheel action to advance or roll back the video frames
     function mouseplay_callback(~,data)
         if isempty(vidObj); return; end;    % without video, do nothing 
-        c = handles.hfig.CurrentPoint;      % get coordinate at wheel time
+        c = hfig.CurrentPoint;      % get coordinate at wheel time
         newframe = data.VerticalScrollCount + vidObj.CurrentFrame;  % calculate new frame to display
         if newframe <= 0 || newframe > vidObj.Frames                % check if in bounds
             return;
@@ -1800,7 +1827,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                      'External frame of pipette pattern','replace');
             passed = false; % so far uneligible, run further tests
             uiwait(hw);
-        elseif ( handles.tmppatframe >= handles.interval.frames(1) && handles.tmppatframe <= handles.interval.frame(2) )
+        elseif ( handles.tmppatframe >= handles.interval.frames(1) && handles.tmppatframe <= handles.interval.frames(2) )
             hw = warndlg({'The pipette pattern originates in this interval, but the reference frame does not belong to the added interval.';...
                      'It is allowed, but make sure the frame of reference has a compatible contrast and uses the same pipette pattern as in this interval.'},...
                      'External frame of reference','replace');
@@ -2306,8 +2333,16 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             RBCframe = round(vidObj.CurrentFrame);
             RBCcontrast = questdlg('Does the red blood cell appear bright or dark?',...
                                    'RBC contrast','bright','dark','bright');
-            assert(any(strcmp(RBCcontrast,{'bright','dark'})),...   % generate error
-                'RBC detection process cancelled by user during contrast polarity choice.');
+                               
+            if all(~strcmp(RBCcontrast,{'bright','dark'}))  % (X) case
+                RBCpoint.delete;                            % delete point
+                source.Callback = {@measureRBC_callback};   % restore callback
+                source.String = '<HTML><center>RBC<br>radius:</HTML>';
+                handles.selecting = false;
+                warn('RBC measurement interrupted by user');
+                return;
+            end
+                
             radrange = [2,3.5]/handles.P2M;    % 2-3 microns radius in pixels
             [RBCcoor,RBCradius_,RBCmet,~] = TrackBead(vidObj,RBCcontrast,RBCinicoor,[RBCframe,RBCframe],...
                                        'radius',radrange, 'sensitivity',0.95,'edge',0.1);
@@ -2328,8 +2363,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     handles.hRBCrad.String = num2str(round(handles.RBCradius,2));
                 end
             end
-        catch EM
-            warn('interrupt',EM.message);
+        catch
+            warn('interrupt');
         end
         RBCpoint.delete;
         source.Callback = {@measureRBC_callback};   % restore callback
@@ -2445,7 +2480,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         end
         
         % detect the bead
-        [beadinfo,pass,rad] = getBead(source,tag,'cbk',@getradrange_callback);
+        [beadinfo,pass,rad] = getBead(source,tag,handles.haxes,'cbk',@getradrange_callback);
         source.String = '<HTML><center>Radius range</HTML>';    % restore button string
         
         if isempty(beadinfo) || ~pass   % check if selection was success
@@ -2572,7 +2607,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             handles.selecting = true;
         end
         
-        [handles.bead,pass,~] = getBead(source,srctag);  % call method to detect bead
+        [handles.bead,pass,~] = getBead(source,srctag,handles.haxes);  % call method to detect bead
         
         % if detection fails (reject or error), old 'handles.bead' value is returned
         % if old value is empty, stop here, do not change anything
@@ -2974,6 +3009,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     if strcmp(tag,'interval')
                         handles.interval.pattern = patinfo.cdata;
                         [hf,hax] = showintpattern_callback();
+                        hf.CloseRequestFcn = {@closeFig};
                     else
                         hax = handles.hminiaxes;
                         imagesc(patinfo.cdata, 'Parent', hax);  % display the cut in the special window
@@ -2982,28 +3018,40 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     
                     BCfunction = makeConstrainToRectFcn('impoint',get(hax,'XLim'),get(hax,'YLim'));
                     anchorpoint = impoint(hax, 'PositionConstraintFcn', BCfunction);
-                    source.String = 'Accept';
-                    source.ForegroundColor = 'red';
-                    source.Callback = 'uiresume(gcbf)';
-                    uiwait(gcbf);
-                    try
-                        patinfo.anchor = anchorpoint.getPosition;                        
-                    catch
-                        warning(strjoin({'An error occured during anchor selection callback,',...
-                        'it was probably interrupted by another function or action.'}));
-                        warndlg({'Selection function failed. The anchor point value (reference) has been set to default';...
-                            'It can still be modified in Interval selection window.'},'Anchor selection failed','replace');
-                        patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
+                    
+                    if isvalid(anchorpoint) % figure not closed by user
+                        source.String = 'Accept';
+                        source.ForegroundColor = 'red';
+                        source.Callback = 'uiresume(gcbf)';
+                        if exist('hf','var')
+                            hf.CloseRequestFcn = 'uiresume(gcbf)';
+                        end
+                        uiwait(gcbf);
+                        try
+                            patinfo.anchor = anchorpoint.getPosition;                        
+                        catch
+                            warning(strjoin({'An error occured during anchor selection callback,',...
+                            'it was probably interrupted by another function or action.'}));
+                            warndlg({'Selection function failed. The anchor point value (reference) has been set to default';...
+                                'It can still be modified in Interval selection window.'},'Anchor selection failed','replace');
+                            patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
+                        end                        
+                        anchorpoint.delete;
                     end
                     set(source, 'String', 'Select', 'ForegroundColor', 'black', 'Callback',  {@getrect_callback,tag});
-                    anchorpoint.delete;
                     if exist('hf','var'); hf.delete; end;
+                    
                 case 'Default'
                     patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
-                otherwise
-                    assert(false,'Pipette pattern selection cancelled by user during anchor choice.');
+                otherwise % case (X)
+                    warn('Pipette pattern selection cancelled by user during anchor choice.');
+                    patinfo = handles.pattern;
+                    pass = false;
+                    source.String = 'Select';
+                    source.Callback = {@getrect_callback, tag};
+                    return;
             end
-
+            
             if strcmp(tag,'interval')
                 handles.hgetpatsubcoor.Enable = 'on';
                 handles.hshowpattern.Enable = 'on';
@@ -3012,8 +3060,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
             end
             pass = true;
             
-        catch ME
-            warn('interrupt',ME.message);
+        catch 
+            warn('interrupt');
             rectangle.delete;
             patinfo = handles.pattern;
             pass = false;
@@ -3023,58 +3071,59 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         source.String = 'Select';
         source.Callback = {@getrect_callback, tag};
         
+        function closeFig(~,~)  % if figure is closed before imroi obj. created
+            patinfo.anchor = round(0.5*[size(patinfo.cdata,2),size(patinfo.cdata,1)]);
+            warndlg({'Selection interrupted. The anchor point value (reference) has been set to default';...
+                     'It can still be modified in Interval selection window.'},'Anchor selection interrupted','replace');
+            uiresume(gcbf);
+        end
+       
     end
 
 %% Detect the bead near the click-provided coordinate
     % detect and return bead information; calls TrackBead method; provides
     % also bead detection radius range calibration
-    function [ beadinfo,pass,rad ] = getBead( source,tag, varargin )
+    function [ beadinfo,pass,rad ] = getBead( source,tag,hax,varargin )
         
-        persistent inpar;   % persistent parser, created only once
-        
+        persistent inpar;   % persistent parser, created only once        
         
         % create parser instance, if not present
         if isempty(inpar)            
-            inpar = inputParser();
-            defaultAxHandle = -1;        % default axes are main figure axes            
+            inpar = inputParser();         
             defaultCallback = @getpoint_callback;   % to reset source cbk
             defaultFrame    = -1;   % no input, flag as -1 (any more elegant solution more than welcome)
 
             inpar.addRequired('source');    % calling uicontrol
             inpar.addRequired('tag');       % call from list or direct
-            inpar.addParameter('hax', defaultAxHandle, @isgraphics);
+            inpar.addRequired('hax', @(x) isgraphics(x,'axes'));       % axes where to get bead
             inpar.addParameter('frm', defaultFrame, @isfloat);
             inpar.addParameter('cbk', defaultCallback );
         end
         
         % parse the inputs (they should allow overloads in Matlab...)
-        inpar.parse(source,tag,varargin{:});
+        inpar.parse(source,tag,hax,varargin{:});
         
         source = inpar.Results.source;
         tag = inpar.Results.tag;
-        if inpar.Results.hax==-1;
-            hax = handles.haxes;
-        else
-            hax = inpar.Results.hax;
-        end
+        haxis = inpar.Results.hax;
         cbk = inpar.Results.cbk;
         if inpar.Results.frm==-1;   % no input, use current frame
             frm = vidObj.CurrentFrame;
         else    % use passed frame
-            frm = inpar.Result.frm;
+            frm = inpar.Results.frm;
         end        
         % =============================================================
         
         beadinfo = struct('coor',[],'frame',[],'contrast',[]);
         % intial section, set boundary, select point, change UI, wait for
         % confirmation of the selection
-        BCfunction = makeConstrainToRectFcn('impoint',get(hax,'XLim'),get(hax,'YLim'));
-        beadpoint = impoint(hax,'PositionConstraintFcn',BCfunction);
+        BCfunction = makeConstrainToRectFcn('impoint',get(haxis,'XLim'),get(haxis,'YLim'));
+        beadpoint = impoint(haxis,'PositionConstraintFcn',BCfunction);
         source.String = 'Confirm';
         source.Callback = 'uiresume(gcbf)';
         uiwait(gcf);
         
-         try
+        try
             beadinfo.coor = beadpoint.getPosition;
             beadinfo.frame= round(frm);
             choice = questdlg('Select bead contrast. For a bead darker than background, select ''Dark'', and visa versa.',...
@@ -3084,11 +3133,18 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     beadinfo.contrast = 'bright';
                 case 'Dark'
                     beadinfo.contrast = 'dark';
+                otherwise   % (X) case
+                    beadinfo = handles.bead;
+                    pass=false;
+                    rad = 0;
+                    beadpoint.delete;
+                    source.String = 'Select';
+                    source.Callback = {cbk,tag};
+                    warn('Bead selection cancelled by user during contrast choice.');
+                    return;
             end;
             beadpoint.delete;
-            assert(any(strcmp(beadinfo.contrast,{'dark','bright'})),...
-                'Bead selection cancelled by user during contrast choice.');
-            
+
             if strcmp(tag,'beadrad')      
                 defaultRad = [5,50];    % wide range to catch-all (nearly)
             else
@@ -3114,7 +3170,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     'and detection failures can occur.'}));
             end;
                 
-            hcirc = viscircles(hax,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot the detected bead
+            hcirc = viscircles(haxis,[ coor(2), coor(1) ], rad, 'EdgeColor','r');    % plot the detected bead
             choice = questdlg('Was the bead detected correctly?','Confirm selection','Accept','Reject','Accept');
             switch choice
                 case 'Accept'   % precise the coordinate
@@ -3125,8 +3181,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
                     pass = false;
             end;
             hcirc.delete;
-         catch ME
-            warn('interrupt', ME.message);
+        catch 
+            warn('interrupt');
             beadpoint.delete;
             beadinfo = handles.bead;
             pass=false;
@@ -3692,7 +3748,7 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
         if isgraphics(hviscirc); hviscirc.Visible = 'off'; end;     % hide the circle
         
         tag = 'interval';
-        [ beadinfo, pass, rad ] = getBead( source, tag, 'hax', hax, 'frm', frm );
+        [ beadinfo, pass, rad ] = getBead( source, tag, hax, 'frm', frm );
         source.Callback = {@getcalibead_callback,hax,frm};  % reset the callback changed in getBead method
         source.String   = 'Get Bead';
         
