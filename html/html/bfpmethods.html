@@ -1,0 +1,182 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>BFPClass methods</title><meta name="generator" content="MATLAB 8.6"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2016-07-08"><meta name="DC.source" content="bfpmethods.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; } 
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h1>BFPClass methods</h1><p>Methods will be explained in detail.</p><p><b>parameters setting functions</b> (consult <i>BFPClass</i> documentation for parameters details)</p><div><ul><li>getParameters(Rg,Rc,Rp,P): sets objects values for radii of RBC (Rg), RBC-bead contact (Rc), inner pipette radius (Rp) and aspiration pressure (P)</li><li>getBeadParameters(radius,buffer,sensitivity,edge,metric,P2M): sets parameters for bead tracking; radius range (radius), maximal number of frames of failed tracking (buffer), circle sensitivity (sensitivity), edge sensitivity to determine edge pixels (edge), detection strength metric threshold (metric), and pixel-to-micron ratio (P2M)</li><li>getPipetteParameters(correlation,contrast,buffer): sets parameters for pipette pattern matching; correlation coefficient threshold (correlation), contrast metric threshold (contrast), and maximal number of consecutive frames of failed tracking (buffer)</li></ul></div><p><b>tracking control function</b></p><div><ul><li>Track(hplot): input is a handle to a target graph, where results of tracking are immediatelly plotted. The function creates a <b>progress bar</b> indicating percentage of frames finished; this progress bar also allows user to cancel the tracking using <b>Cancel</b> button. It cycles through the intervals contained in object's <i>intervallist</i> variable and for each, it calls <i>TrackPipette</i> method and <i>TrackBead</i> method, one after another. If tracking fails during the interval, the interval is excluded from the results, and momentary results are dumped into the <i>base</i> Matlab workspace. On the other hand, the method marks each finished interval as tracked by setting its <i>tracked</i> variable to <i>true</i>. After all intervals have been processed, the method calls <i>generateReport</i> function, to generate fidelity summary of tracking. In the end, it plots the results into the <i>hplot</i> axes.</li></ul></div><p><b>plotting and reports</b></p><div><ul><li>plotTracks(hplot; fInd, lInd, pip, bead, Style, Calibration): only required input are the target axes handle, <i>hplot</i>, where the function optputs. Optional inputs are:</li></ul></div><div><ol><li>fInd: first index of the plotted window; interger</li><li>lInd: last index of the plotted window; interger</li><li>pip: switch to plot or not data for the pipette, if applicable; boolean</li><li>bead: switch to plot or not data for the brad, if applicable; boolean</li></ol></div><p>The remaining options are parameters passed as 'name',value pair</p><div><ol><li>Style: a string determining what should be plotted; one of the following '3D' (trajectories with time axis), '2D' (trajectories without time axis), 'F' (force), 'M' (tracking metric)---default is '3D'</li><li>Calibration: information, whether the probe has been calibrated; boolean (default is false)</li></ol></div><div><ul><li>[hrepfig] = generateReport(): takes no inputs and returns a handle to the report figure <i>hrepfig. Report agregates the _badFrames</i> arrays returned for each interval by tracking methods. These are the frames, where tracking was considerably underperforming or downright failed. The method marks intervals of prolonged tracking uncertainty and reports explicitly intervals of lower confidence. The report comes with detailed explanatory text.</li></ul></div><div><ul><li>generateTracks(VideoPath,Name,Profile,Framerate,Sampling): all the inputs are parameter. <i>VideoPath</i> is path to the folder where video file will be saved (default is the same as the source video), <i>Name</i> is the name of the exported video (default is old video name appended by 'Tracks.avi'), <i>Profile</i> is the type of the output (default is 'Motion JPEG AVI', consult Matlab VideoWriter for more options), <i>Framerate</i> is the framerate of the output in fps (default is 10), <i>Sampling</i> set the rate of sampling from the original video (default  is 1, i.e. every frame is taken). The video is generated with overlaying tracking marks (red circles delineating the bead, blue ring delineating the anchor point on the pipette) and annotated by the frame index.</li></ul></div><p><b>force calculation</b></p><div><ul><li>[overLimit]=getForce(hplot,calib): takes handle to the plot axes <i>hplot</i> and information whether the probe has been calibrated <i>calib</i>. These inputs are passed to plotting function <i>plotTracks</i> when the results are plotted by the function. The function returns <i>overLimit</i>, which is <i>true</i> if RBC extension at any processed frame exceeds <i>linearLimit</i>. This indicates, that conditions of linear force-strain ratio may not hold well at some intervals. The method cycles through all thre intervals, excludes those, where tracking failed, and calculates force magnitude for each valid frame, based on the detected RBC deformation (extension or compression, <img src="bfpmethods_eq16319215787732310329.png" alt="$\Delta x$">) and the stiffness <i>k</i> of the RBC, as <img src="bfpmethods_eq11892796486775896538.png" alt="$F=k\cdot\Delta x$">. The unloaded size of the RBC is provided as part of <i>intervallist</i>. The RBC stiffness is calculated by function <i>getStiffness</i>.</li><li>getStiffness(): calculates the stiffness of the bead based on the equation --- put equation and reference!!!</li></ul></div><p><b>data access</b></p><div><ul><li>[value]=getByFrame(frm,type): returns a requested quality for a requested frame. Two required inputs, <i>frm</i> is index of the requested frame, <i>type</i> is the type out of the following list 'force' (magnitude of force), 'pipette' (coordinates of pipette anchor), 'bead' (coordinates of bead centre), 'metric' (pipette and bead detection strength metric).</li><li>importData(type,data;range): imports outer formatted data into the object. The <i>data</i> must be in collumns, first collumn numbering the frames. <i>type</i> is the type of data of the following list 'force' (forces), 'beadPositions' (coordinates of bead centre), 'pipPositions' (coordinates of pipette anchor). Parameter <i>range</i> restricts the interval of import.</li></ul></div><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2015b</a><br></p></div><!--
+##### SOURCE BEGIN #####
+%% BFPClass methods
+% Methods will be explained in detail.
+%
+% *parameters setting functions*
+% (consult _BFPClass_ documentation for parameters details)
+%
+% * getParameters(Rg,Rc,Rp,P): sets objects values for radii of RBC (Rg),
+% RBC-bead contact (Rc), inner pipette radius (Rp) and aspiration pressure
+% (P)
+% * getBeadParameters(radius,buffer,sensitivity,edge,metric,P2M): sets
+% parameters for bead tracking; radius range (radius), maximal number of
+% frames of failed tracking (buffer), circle sensitivity (sensitivity),
+% edge sensitivity to determine edge pixels (edge), detection strength
+% metric threshold (metric), and pixel-to-micron ratio (P2M)
+% * getPipetteParameters(correlation,contrast,buffer): sets parameters for
+% pipette pattern matching; correlation coefficient threshold
+% (correlation), contrast metric threshold (contrast), and maximal number
+% of consecutive frames of failed tracking (buffer)
+%
+% *tracking control function*
+%
+% * Track(hplot): input is a handle to a target graph, where results of
+% tracking are immediatelly plotted. The function creates a *progress bar*
+% indicating percentage of frames finished; this progress bar also allows
+% user to cancel the tracking using *Cancel* button. It cycles through the
+% intervals contained in object's _intervallist_ variable and for each, it
+% calls _TrackPipette_ method and _TrackBead_ method, one after another. If
+% tracking fails during the interval, the interval is excluded from the
+% results, and momentary results are dumped into the _base_ Matlab
+% workspace. On the other hand, the method marks each finished interval as
+% tracked by setting its _tracked_ variable to _true_. After all intervals
+% have been processed, the method calls _generateReport_ function, to
+% generate fidelity summary of tracking. In the end, it plots the results
+% into the _hplot_ axes.
+%
+% *plotting and reports*
+%
+% * plotTracks(hplot; fInd, lInd, pip, bead, Style, Calibration): only
+% required input are the target axes handle, _hplot_, where the function
+% optputs. Optional inputs are: 
+%
+% # fInd: first index of the plotted window; interger
+% # lInd: last index of the plotted window; interger
+% # pip: switch to plot or not data for the pipette, if applicable; boolean
+% # bead: switch to plot or not data for the brad, if applicable; boolean
+%
+% The remaining options are parameters passed as 'name',value pair
+%
+% # Style: a string determining what should be plotted; one of the
+% following '3D' (trajectories with time axis), '2D' (trajectories without
+% time axis), 'F' (force), 'M' (tracking metric)REPLACE_WITH_DASH_DASH-default is '3D'
+% # Calibration: information, whether the probe has been calibrated;
+% boolean (default is false)
+%
+% * [hrepfig] = generateReport(): takes no inputs and returns a handle to
+% the report figure _hrepfig. Report agregates the _badFrames_ arrays
+% returned for each interval by tracking methods. These are the frames,
+% where tracking was considerably underperforming or downright failed. The
+% method marks intervals of prolonged tracking uncertainty and reports
+% explicitly intervals of lower confidence. The report comes with detailed
+% explanatory text.
+%
+% * generateTracks(VideoPath,Name,Profile,Framerate,Sampling): all the
+% inputs are parameter. _VideoPath_ is path to the folder where video file
+% will be saved (default is the same as the source video), _Name_ is the
+% name of the exported video (default is old video name appended by
+% 'Tracks.avi'), _Profile_ is the type of the output (default is 'Motion
+% JPEG AVI', consult Matlab VideoWriter for more options), _Framerate_ is 
+% the framerate of the output in fps (default is 10), _Sampling_ set the 
+% rate of sampling from the original video (default  is 1, i.e. every 
+% frame is taken). The video is generated with overlaying tracking marks
+% (red circles delineating the bead, blue ring delineating the anchor point
+% on the pipette) and annotated by the frame index.
+%
+% *force calculation*
+%
+% * [overLimit]=getForce(hplot,calib): takes handle to the plot axes
+% _hplot_ and information whether the probe has been calibrated _calib_.
+% These inputs are passed to plotting function _plotTracks_ when the
+% results are plotted by the function. The function returns _overLimit_,
+% which is _true_ if RBC extension at any processed frame exceeds
+% _linearLimit_. This indicates, that conditions of linear force-strain
+% ratio may not hold well at some intervals. The method cycles through all
+% thre intervals, excludes those, where tracking failed, and calculates
+% force magnitude for each valid frame, based on the detected RBC
+% deformation (extension or compression, $\Delta x$) and the stiffness _k_ of the RBC,
+% as $F=k\cdot\Delta x$. The unloaded size of the RBC is provided as part
+% of _intervallist_. The RBC stiffness is calculated by function
+% _getStiffness_.
+% * getStiffness(): calculates the stiffness of the bead based on the
+% equation REPLACE_WITH_DASH_DASH- put equation and reference!!!
+%
+% *data access*
+%
+% * [value]=getByFrame(frm,type): returns a requested quality for a
+% requested frame. Two required inputs, _frm_ is index of
+% the requested frame, _type_ is the type out of the following list
+% 'force' (magnitude of force), 'pipette' (coordinates of pipette anchor),
+% 'bead' (coordinates of bead centre), 'metric' (pipette and bead detection
+% strength metric).
+% * importData(type,data;range): imports outer formatted data into the object. 
+% The _data_ must be in collumns, first collumn numbering the frames. _type_ 
+% is the type of data of the following list 'force' (forces),
+% 'beadPositions' (coordinates of bead centre), 'pipPositions' (coordinates
+% of pipette anchor). Parameter _range_ restricts the interval of import.
+
+
+
+
+
+##### SOURCE END #####
+--></body></html>
