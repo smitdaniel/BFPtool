@@ -1,0 +1,128 @@
+<deployment-project plugin="plugin.apptool" plugin-version="1.0">
+  <configuration build-checksum="3478938128" file="/home/daniel/Documents/Tool/tool/BFPTool.prj" location="/home/daniel/Documents/Tool/tool" name="BFPTool" target="target.mlapps" target-name="Package App">
+    <param.appname>BFPTool</param.appname>
+    <param.authnamewatermark>Daniel Smit</param.authnamewatermark>
+    <param.email>daniel.smit@biomed.cas.cz</param.email>
+    <param.company>Institute of Physiology, CAS</param.company>
+    <param.icon />
+    <param.icons />
+    <param.summary>A tool to analyse recording of BFP experiments. Performs tracking, force calculation and basic analysis.</param.summary>
+    <param.description>The application with an extensive GUI to track bead and pipette of a BFP experiment and calculate probe's force time course based on the tracking information. It allows to build a chain of incontiguous intervals of frames of the recording to avoid failing focus or footage without valid experimental material. The results can be exported and transfered to another machine. The tool contains Matlab ported documentation and extensive guidelining material.</param.description>
+    <param.screenshot />
+    <param.version>1.0</param.version>
+    <param.products.name>
+      <item>MATLAB</item>
+      <item>Image Processing Toolbox</item>
+    </param.products.name>
+    <param.products.id>
+      <item>1</item>
+      <item>17</item>
+    </param.products.id>
+    <param.products.version>
+      <item>8.6</item>
+      <item>9.3</item>
+    </param.products.version>
+    <param.platforms />
+    <param.output>/home/daniel/Documents/Tool/tool</param.output>
+    <param.guid>0e8236a5-efc2-4523-92d5-162ded24f6a2</param.guid>
+    <unset>
+      <param.authnamewatermark />
+      <param.email />
+      <param.company />
+      <param.icon />
+      <param.icons />
+      <param.screenshot />
+      <param.version />
+      <param.platforms />
+      <param.output />
+    </unset>
+    <fileset.main>
+      <file>${PROJECT_ROOT}/BFPGUI.m</file>
+    </fileset.main>
+    <fileset.depfun>
+      <file>${PROJECT_ROOT}/BFPClass.m</file>
+      <file>${PROJECT_ROOT}/BFPGUIbackdoor.m</file>
+      <file>${PROJECT_ROOT}/TrackBead.m</file>
+      <file>${PROJECT_ROOT}/TrackPipette.m</file>
+      <file>${PROJECT_ROOT}/html/GUI.m</file>
+      <file>${PROJECT_ROOT}/html/advanced.m</file>
+      <file>${PROJECT_ROOT}/html/application.m</file>
+      <file>${PROJECT_ROOT}/html/basic.m</file>
+      <file>${PROJECT_ROOT}/html/bfpmethods.m</file>
+      <file>${PROJECT_ROOT}/html/computations.m</file>
+      <file>${PROJECT_ROOT}/html/html/BFPexample.png</file>
+      <file>${PROJECT_ROOT}/html/html/GUI.html</file>
+      <file>${PROJECT_ROOT}/html/html/GUI_eq08597826192214703288.png</file>
+      <file>${PROJECT_ROOT}/html/html/GUI_eq08751779600777614722.png</file>
+      <file>${PROJECT_ROOT}/html/html/GUI_eq11892796486775896538.png</file>
+      <file>${PROJECT_ROOT}/html/html/GUI_eq15032494942525236997.png</file>
+      <file>${PROJECT_ROOT}/html/html/GUI_eq15636846968047188835.png</file>
+      <file>${PROJECT_ROOT}/html/html/GUI_eq16319215787732310329.png</file>
+      <file>${PROJECT_ROOT}/html/html/advanced.html</file>
+      <file>${PROJECT_ROOT}/html/html/advancedAnchor.png</file>
+      <file>${PROJECT_ROOT}/html/html/advancedCont.png</file>
+      <file>${PROJECT_ROOT}/html/html/advancedFit.png</file>
+      <file>${PROJECT_ROOT}/html/html/advancedFitMontage.png</file>
+      <file>${PROJECT_ROOT}/html/html/advancedForce.png</file>
+      <file>${PROJECT_ROOT}/html/html/advancedInt.png</file>
+      <file>${PROJECT_ROOT}/html/html/advancedIntList.png</file>
+      <file>${PROJECT_ROOT}/html/html/advanced_eq01333245096171706828.png</file>
+      <file>${PROJECT_ROOT}/html/html/advanced_eq03442895190380135198.png</file>
+      <file>${PROJECT_ROOT}/html/html/advanced_eq15636846968047188835.png</file>
+      <file>${PROJECT_ROOT}/html/html/application.html</file>
+      <file>${PROJECT_ROOT}/html/html/basic.html</file>
+      <file>${PROJECT_ROOT}/html/html/basicGUIconfirm.png</file>
+      <file>${PROJECT_ROOT}/html/html/basicGUIforce.png</file>
+      <file>${PROJECT_ROOT}/html/html/basicGUIpic.png</file>
+      <file>${PROJECT_ROOT}/html/html/basicGUIpip.png</file>
+      <file>${PROJECT_ROOT}/html/html/basic_eq02265842152316728025.png</file>
+      <file>${PROJECT_ROOT}/html/html/basic_eq12534472291285360343.png</file>
+      <file>${PROJECT_ROOT}/html/html/basic_eq15636846968047188835.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods.html</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq11892796486775896538.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq16319215787732310329.png</file>
+      <file>${PROJECT_ROOT}/html/html/computations.html</file>
+      <file>${PROJECT_ROOT}/html/html/computations_eq03913420396963328117.png</file>
+      <file>${PROJECT_ROOT}/html/html/computations_eq14817942261281681460.png</file>
+      <file>${PROJECT_ROOT}/html/html/computations_eq15943080336943517084.png</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_1.cfe</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_1.cfs</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_1.si</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments.gen</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments_2</file>
+      <file>${PROJECT_ROOT}/html/html/helptoc.xml</file>
+      <file>${PROJECT_ROOT}/html/html/main.html</file>
+      <file>${PROJECT_ROOT}/html/html/methods.html</file>
+      <file>${PROJECT_ROOT}/html/info.xml</file>
+      <file>${PROJECT_ROOT}/html/main.m</file>
+      <file>${PROJECT_ROOT}/vidWrap.m</file>
+    </fileset.depfun>
+    <fileset.resources>
+      <file>${PROJECT_ROOT}/html</file>
+    </fileset.resources>
+    <fileset.package />
+    <build-deliverables>
+      <file location="/home/daniel/Documents/Tool" name="tool" optional="false">/home/daniel/Documents/Tool/tool</file>
+    </build-deliverables>
+    <workflow />
+    <matlab>
+      <root>/usr/local/MATLAB/R2015b</root>
+      <toolboxes />
+    </matlab>
+    <platform>
+      <unix>true</unix>
+      <mac>false</mac>
+      <windows>false</windows>
+      <win2k>false</win2k>
+      <winxp>false</winxp>
+      <vista>false</vista>
+      <linux>true</linux>
+      <solaris>false</solaris>
+      <osver>4.4.0-31-generic</osver>
+      <os32>false</os32>
+      <os64>true</os64>
+      <arch>glnxa64</arch>
+      <matlab>true</matlab>
+    </platform>
+  </configuration>
+</deployment-project>
