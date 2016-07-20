@@ -119,7 +119,6 @@ haradius = radius;
 % sets OUT variables and temporary variables
 
 warn = 1;   % frame number of the last warning
-box = [floor( inicoor - side); ceil( inicoor + side)]; % set box around provided coordinate; [r,c]
 
 radii = zeros( range(2) - range(1) + 1,1);      % preallocate; radii of the beads
 centres = zeros( range(2) - range(1) + 1, 2);   % proallocate; centres of the bead
@@ -135,6 +134,11 @@ frame = vidObj.readFrame(range(1));   % set the first frame;
 threshRelaxes = [0,0];      % how many times were thresholds relaxed, following poor contrast or metric
 rmax = size(frame.cdata,1); % number of image data rows
 cmax = size(frame.cdata,2); % number of image data columns
+box = [floor( inicoor - side); ceil( inicoor + side)]; % set box around provided coordinate; [r,c]
+box(1,1) = max(box(1,1),1);         % do not let the box outside ...
+box(1,2) = max(box(1,2),1);         % ... the frame field
+box(2,1) = min(box(2,1),rmax);
+box(2,2) = min(box(2,2),cmax);
 
 % === waitbar ===
 if tbSwitch     % do use WB
@@ -218,9 +222,9 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
     if( distance(1) == 0 && failcounter < buffer )     % failed to detect anything -- 'buffer' consecutive failed detections allowed
         found = false;
         calls = 1;
-        while( ~found && calls <= retries );   % try progressively less restrictive search
-            found = retry(calls);
-            calls = calls + 1;
+        while( ~found && calls <= retries );    % try progressively less restrictive search
+            found = retry(calls);               % this block is not called during a retry call
+            calls = calls + 1;                  % retry call has 0 retries
         end;
         if ~found;                              % if still nothing is found 
             failcounter = failcounter + 1;
@@ -232,7 +236,10 @@ while( (vidObj.CurrentFrame <= vidObj.Frames) && (frames <= framesToPass) ) % wh
                 warning(strjoin({'Bead detection failure at frame',num2str(range(1) + frames - 1),char(10),...
                 'Consecutive failures: ', num2str(failcounter),'/',num2str(buffer)}));
             end;
+        else    % if a bead is found during retries cycle
+            centre = [centre(2) + box(1,1) - 1, centre(1) + box(1,2) - 1];
         end
+            
     elseif(distance(1) == 0 && failcounter >= buffer)   % 'buffer' failures in a row, abort
         cleanBreak(false);
         warndlg(strjoin({num2str(buffer), 'consecutive frame failures, detection failed at frame',...
@@ -329,7 +336,7 @@ function [got] = retry(C)
         'radius', max(radius + [-C,+C],1), 'sensitivity', min(sensitivity+0.1*C,1),...
         'edge', max(edge-0.1*C,0),'retries',0, 'retry', true,'side',side + [2,2]*C);
     
-    if m > 0             % if bead is found
+    if m > 0             % if a bead is found
         centre = c - [2,2]*C;   % correct the box shift, before global coordinates calculated in the main run
         rad    = r;
         metric = m;
