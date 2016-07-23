@@ -4,19 +4,19 @@ A Matlab based tool with GUI designed to process and analyse videos recorded dur
 
 ## Getting Started
 
-The installation of the tool is simple. Repository contains BFPTool.mlinstall file, which allows direct installation into Matlab as an external app. Matlab unpacks the source files and documentation into Matlab App directory, the source M-files can be modified there.
+The installation of the tool is simple. Repository contains BFPTool.mlappinstall file, which allows direct installation into Matlab as an external app. Matlab unpacks the source files and documentation into Matlab App directory, the source M-files can be modified there.
 
-### Prerequisities
+### Prerequisites
 
 The software runs under Matlab (tested on 2015a and newer) with Image Processing Toolkit. It was tested so far under Linux (Ubuntu 16.04), Windows 10 and Mac OS 10.9 and later.
 
-### Installing
+### Installation
 
-Application can be installed into Matlab application dashbar. Click the button Install Application at the dashbar and brows to the BFPTool.mlinstall file. An icon to the app appears on the dashbar.
+Application can be installed into Matlab application dashbar. Click the button Install App on the Apps tab and browse to the BFPTool.mlappinstall file. An icon to the app appears on the dashbar.
 
-Repository also contains source M-files, BFPGUI.m, BFPClass.m, TrackBead.m, TrackPipette.m, vidWrap.m and BackDoor.m. These files containt the full code (without documentation) and are sufficient to run the application and modify it. No installation is necessary, the files just need to be in a directory on the Matlab path.
+Repository also contains source M-files, BFPGUI.m, BFPClass.m, TrackBead.m, TrackPipette.m, vidWrap.m and BackDoor.m. These files contain the full code (without documentation) and are sufficient to run the application and modify it. No installation is necessary, the files just need to be in a directory on the Matlab path.
 
-The folder /html contains M-files used to generate the Documentation and the Documentation itself. If the app is installed through MLINSTALL file, the documentation is automatically loaded (during the first app run) into the Matlab help interface.
+The folder /html contains M-files used to generate the Documentation and the Documentation itself. If the app is installed through MLAPPINSTALL file, the documentation is automatically loaded (during the first application run) into the Matlab help interface and is fully searchable.
 
 ## Running the app
 
@@ -24,15 +24,15 @@ The program can be run either from the Matlab dashboard (if installed through th
 
 ### Testing material
 
-The repository contains a folder /testvideos which contains recorded footage from BFP experiments. Users can use this footage to learn how to use the tool. The file 'basic.avi' can be analyzed without detailed settings of the GUI. The other two files 'interrupted.avi' and 'multiinterval.avi' help user to see why some of the settings and features are necessary.
+The repository contains a folder /testvideo which contains recorded footage from BFP experiments. Users can use this footage to learn how to use the tool. The file 'basic.avi' can be analysed without detailed settings of the GUI. The other two files 'interrupted.avi' and 'multiinterval.avi' help user to see why some of the settings and features are necessary. The Documentation contains a step-by-step guide, which can be used with these videos (tested).
 
 ## State of the program and cooperation
 
-The program has been tested and is robust for the most of conceivable use. More tests on unlikely or illogical combinations or sequences of steps would be very helpful. The program was also being implemented gradually with emphasise on functionality and robustness, coding elegance was not a priority. Particularly sections of GUI could be improved, having several functions merged into one. 
+The program has been tested and is robust for the most of conceivable use. More tests on unlikely or illogical combinations or sequences of steps would be very helpful. The program was also being implemented gradually with emphasise on functionality and robustness, coding elegance was not a priority. Particularly sections of GUI could be improved, having several functions merged into one.
 
 ### Scientific community
 
-This program is dedicated to the scientific community working (or willing to work) with BFP technique. For anyone else, any form of use is hard to imagine.
+This program is dedicated to the scientific community working (or willing to work) with the BFP technique. For anyone else, any form of use is hard to imagine.
 
 ## License information
 
@@ -53,8 +53,8 @@ This program is free software: you can redistribute it and/or modify
 
 * initial work was done by Daniel Smit, with intensive testing by Mohamed Doulazmi
 
-## Acknowledgments
+## Acknowledgements
 
 * many helpful comments and ideas came from Alain Trembleau and Martin Zapotocky
 * initial ideas as how to treat the videos, which eventually led to the development of the application must be contributed to Frederic Pincet
-* thanks also go to Nicola Debray for help with testing
+* thanks also go to Nicolas Debray for help with testing

@@ -5,12 +5,12 @@
 %   fitting, measurements, fine-tuning of the detection), and import-export
 %   tools.
 %   *OUT:*
+%   hfig: handle to the main GUI figure, returned
 %   backdoorObj: is a handle superclass object, which is connected to some of
 %   the important parameters within the BFPClass and BFPGUI. It allows user
 %   to change these parameters from the Matlab command line. It is usually
 %   not necessary to access these paremeters. (not passed bus assigned to
 %   the base workspace)
-%   hfig: handle to the main GUI figure
 %   *IN:*
 %   loadData (Optional): allows user to start GUI instance with data 
 %   imported from an older MAT file form earlier session or another machine
@@ -3843,3 +3843,5 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     end
 
 end
+
+% last visit on July 23

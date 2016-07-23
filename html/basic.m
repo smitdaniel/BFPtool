@@ -18,33 +18,36 @@
 %
 % # In *Open a video* panel, either type video file _full path_ into the edit field,
 % or navigate to the file using *Browse* button.
-% # Click *Open*. The video is openned, first frame displayed in the *video
+% # Click *Open*. The video is opened, first frame displayed in the *video
 % player*, buttons in the *Video commands* panel enabled and information
 % about the video in *Video information* panel populated.
 % # You can review the video by sliding the bar under the frame (marked by the 
 % red box in |figure 1|), or using
 % buttons *Fast forward*, *Rewind*, or *Frame* (*go to* button, marked by a 
-% green box in |Figure 1|) in *Video commands* panel.
+% green box in |Figure 1|) in the *Video commands* panel.
 % # Click *Analyse contrast* button on the *Video commands* panel. This
 % button calculates contrast time course (as seen in the graph of |Figure 1|)---it is the
 % first guide for video editing/interval selection. Note You can switch between contrast
 % measure (*SD2*) and local contrast measure variability (*rSD2*) using
-% radiobutton on panel *Tracking*.
+% radiobutton on panel *Tracking* (marked in cyan in |figure 1|).
 %
 % When openning a TIFF format file, a prompt dialog requests the user to
-% provide video framerate, as the information cannot be obtained from the
-% TIFF file itself.
+% provide video framerate, if the information cannot be obtained from the
+% TIFF file itself. If the TIFF framerate information is loaded from the
+% metadata, but appears incorrect, user can change the framerate using the
+% button *Reframerate* on the *Video information* panel (available only for
+% TIFF video files).
 %
 % In this example, we will track the whole video in one interval. It is not
-% necessary to exclude any frames. Therefore, we only need to choose one
+% necessary to exclude any frames, nor subdivide the tracking. Therefore, we only need to choose one
 % bead and one pipette pattern. The contrast information supports the image
 % stability assumption, but it is always a good practice to review both
-% contrast measures and inspect the video in suspisiosly looking intervals.
+% contrast measures (*SD2* and *rSD2*) and inspect the video in suspisiosly looking intervals.
 %
 %% Select tracked bead
 %
 % # Click *Select* button on the *Selected bead* line in the *Set interval*
-% panel (tab). The pointer turns into a cross-hair (on video frame canvas).
+% panel (tab). The pointer turns into a cross-hair (on the video frame canvas).
 % # Click within the bead You want to track. You can repositon the blue 
 % cross-mark as necessary (it is highlighted by blue ring in |Figure 2|).
 % # Confirm the mark position by clicking the same button, now labelled 
@@ -60,7 +63,7 @@
 %
 % <<basicGUIconfirm.png>>
 %
-% |Figure 2: Select the bead to track and confirm|
+% |Figure 2: Select the bead to track and confirm. The cross mark can be repositioned by dragging.|
 %
 %% Select pipette pattern
 %
@@ -98,7 +101,8 @@
 % frame), the green box the *final frame* of the tracking interval.
 % # The yellow box in |Figure 3| indicates the _index_ of the frame, where the
 % RBC is unstrained (i.e. RBC and bead touch, but no load is applied). This
-% frame must be provided by user.
+% frame must be provided by user and can be soure of systematic error (i.e. all the
+% deformation calculations can be shifted by a constant value).
 % # When the *pipette*, the *bead*, and the interval *key frames* (i.e. initial, 
 % final and reference frames) are selected, it can be added to the list of
 % intervals for tracking using button *Add to list* on *Set interval* panel.
@@ -109,7 +113,8 @@
 % (*frame of reference*), where the probe is under
 % no strain allows to measure reference distance of these two items. As the
 % distance between the two points changes during the experiment, we assume, the
-% deformation (extesion or compression) of RBC is equal the change.
+% deformation (extesion or compression) of RBC is equal to the change (this 
+% may not completely hold for experiments, where probe deviates from its axis).
 %
 %% Tracking and force calculation
 %
@@ -125,11 +130,14 @@
 % appear warning the probe was not properly calibrated, click *Proceed*,
 % the _Probe calibration_ will be described in _Advanced features_ section. The
 % force is calculated and displayed in the *graph*, as well as deformation. RBC stiffness $k$ and its
-% uncertainty $\Delta k$ are displayed on the left of the *Get Force* button.
+% uncertainty $\Delta k$ are displayed to the left of the *Get Force*
+% button. In case the values are poorly legible, click the *k* button.
 %
 % The fidelity report can help to identify problematic intervals
 % post-processing. In reported intervals, the tracking could be unreliable,
-% and user may need to remove them from the tracking.
+% and user may need to remove them from the tracking. The fidelity report
+% can be displayed any time after tracking clicking the button *View
+% Report* on the *Tracking* panel (marked by a red box in |figure 4|).
 %
 % The *force* is calculated in linear approximation, i.e. we assume linear
 % relation between the RBC deformation and the exerted force. This is
@@ -138,16 +146,18 @@
 %
 % The major information about the experiment, the *force* (though
 % uncalibrated) and the *deformation* are obtained in several simple steps.
-% User is then free to analyse them and export for further processing as they like.
+% User is then free to analyse them and export for further processing as she likes.
 % To obtain more
 % detailed analysis, with calibration and fine tuning, several more
-% features are available and are covered in section _Advanced features_.
+% features are available and are covered in the section _Advanced features_.
 % The final GUI appearance is shown in |Figure 4|, with tracking marks
-% overlaid on the video frame and the *force* displayed in the *graph*.
+% overlaid on the video frame and the *force* displayed in the *graph* 
+% (with particular timepoint selected and marked by a red vertical line).
 %
 % <<basicGUIforce.png>>
 %
-% |Figure 4: BFPTool GUI after the force analysis|
+% |Figure 4: BFPTool GUI after the force analysis. Particular force for the
+% displayed frame is marked by a vertical red line in the graph.|
 
 
 

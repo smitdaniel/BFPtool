@@ -67,7 +67,7 @@ if isempty(inp)     % create input parser
     addParameter(inp,'buffer',defaultBuffer,@(x) (isnumeric(x) && x > 0));
     addParameter(inp,'sensitivity',defaultSensitivity,@isnumeric);
     addParameter(inp,'edge',defaultEdge,@isnumeric);
-    addParameter(inp,'side',defaultSide,@isnumeric);
+    addParameter(inp,'side',defaultSide,@(x) (isnumeric(x) && x > 0));
     addParameter(inp,'robustness',defaultRobustness,@isnumeric);
     addParameter(inp,'quality',defaultImageQuality,@isnumeric);
     addParameter(inp,'review',defaultReview,@isnumeric);
@@ -95,7 +95,12 @@ radius(2)= round(max(radius(1),radius(2)));    % make sure r(2) >= r(1); must be
 buffer   = round(inp.Results.buffer);
 sensitivity = inp.Results.sensitivity;
 edge     = inp.Results.edge;
-side     = inp.Results.side;
+if numel(inp.Results.side)~=2      % if not two side are provided, use default
+    side = defaultSide;
+else
+    side = inp.Results.side;
+end
+side     = max(side,radius(2)*2);   % make sure the space is large enough, depending on the resolution of the video
 robust   = inp.Results.robustness;
 quality  = inp.Results.quality;
 review   = inp.Results.review;
@@ -374,3 +379,4 @@ end
   
 end
 
+% last visit on July 23

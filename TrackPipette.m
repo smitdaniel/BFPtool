@@ -12,6 +12,8 @@
 %   * wideField  : switch for unrestricted search in the whole field
 %   * buffer  : number of failed consecutive frame searches before aborting
 %   * waitbar : handle to figure of tracking progress bar started externally
+%   * dilate  : pair of values delimiting range of eroded/dilated patterns
+%   to test
 %   
 %   *OUT:*
 %   * position   : array of pipette positions for each frame
@@ -530,3 +532,4 @@ end;
    
 end
 
+% last visit on July 23

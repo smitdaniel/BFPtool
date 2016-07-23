@@ -1,5 +1,5 @@
 %% BFPClass methods
-% Methods will be explained in detail.
+% Methods will be explained in detail in this page.
 %
 % *parameters setting functions*
 % (consult _BFPClass_ documentation for parameters details)
@@ -20,12 +20,12 @@
 % *tracking control function*
 %
 % * Track(hplot): input is a handle to a target graph, where results of
-% tracking are immediatelly plotted. The function creates a *progress bar*
+% tracking are plotted immediatelly after the processing. The function creates a *progress bar*
 % indicating percentage of frames finished; this progress bar also allows
 % user to cancel the tracking using *Cancel* button. It cycles through the
 % intervals contained in object's _intervallist_ variable and for each, it
 % calls _TrackPipette_ method and _TrackBead_ method, one after another. If
-% tracking fails during the interval, the interval is excluded from the
+% tracking fails during an interval, the interval is excluded from the
 % results, and momentary results are dumped into the _base_ Matlab
 % workspace. On the other hand, the method marks each finished interval as
 % tracked by setting its _tracked_ variable to _true_. After all intervals
@@ -36,15 +36,15 @@
 % *plotting and reports*
 %
 % * plotTracks(hplot; fInd, lInd, pip, bead, Style, Calibration): only
-% required input are the target axes handle, _hplot_, where the function
-% optputs. Optional inputs are: 
+% required input is the target axes handle, _hplot_, where the function
+% outputs. Optional inputs are: 
 %
 % # fInd: first index of the plotted window; interger
 % # lInd: last index of the plotted window; interger
 % # pip: switch to plot or not data for the pipette, if applicable; boolean
-% # bead: switch to plot or not data for the brad, if applicable; boolean
+% # bead: switch to plot or not data for the bead, if applicable; boolean
 %
-% The remaining options are parameters passed as 'name',value pair
+% The remaining options are parameters passed as ('name',value) pair
 %
 % # Style: a string determining what should be plotted; one of the
 % following '3D' (trajectories with time axis), '2D' (trajectories without
@@ -53,7 +53,7 @@
 % boolean (default is false)
 %
 % * [hrepfig] = generateReport(): takes no inputs and returns a handle to
-% the report figure _hrepfig. Report agregates the _badFrames_ arrays
+% the report figure _hrepfig_. Report agregates the _badFrames_ arrays
 % returned for each interval by tracking methods. These are the frames,
 % where tracking was considerably underperforming or downright failed. The
 % method marks intervals of prolonged tracking uncertainty and reports
@@ -88,12 +88,20 @@
 % of _intervallist_. The RBC stiffness is calculated by function
 % _getStiffness_.
 % * getStiffness(): calculates the stiffness of the bead based on the
-% equation --- put equation and reference!!!
+% equation 
+%
+% $$
+% k = R_p\Delta P\frac{\pi}{1-\hat{R}_p}\frac{1}{\log\!\left(\!\frac{4}{\hat{R}_c\hat{R}_p}\right)\!-\left(\!1-\frac{1}{4}\hat{R}_p-\frac{3}{8}\hat{R}_p^2+\hat{R}_c^2\right)}
+% $$
+%
+% where $R_p$ is teh pipette radius, $\Delta P$ is the aspiration pressure, $R_c$
+% is the contact radius. The radii with a hat sign are normalized by the RBC
+% radius $R_g$, i.e. $\hat{R}_p=\frac{R_p}{R_g}$.
 %
 % *data access*
 %
-% * [value]=getByFrame(frm,type): returns a requested quality for a
-% requested frame. Two required inputs, _frm_ is index of
+% * [value]=getByFrame(frm,type): returns a requested quantity for a
+% requested frame. Two required inputs, _frm_ is _index_ of
 % the requested frame, _type_ is the type out of the following list
 % 'force' (magnitude of force), 'pipette' (coordinates of pipette anchor),
 % 'bead' (coordinates of bead centre), 'metric' (pipette and bead detection

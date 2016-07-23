@@ -1,13 +1,13 @@
 <deployment-project plugin="plugin.apptool" plugin-version="1.0">
-  <configuration build-checksum="3478938128" file="/home/daniel/Documents/Tool/tool/BFPTool.prj" location="/home/daniel/Documents/Tool/tool" name="BFPTool" target="target.mlapps" target-name="Package App">
+  <configuration build-checksum="2235884506" file="/home/daniel/Documents/Tool/tool/BFPTool.prj" location="/home/daniel/Documents/Tool/tool" name="BFPTool" target="target.mlapps" target-name="Package App">
     <param.appname>BFPTool</param.appname>
     <param.authnamewatermark>Daniel Smit</param.authnamewatermark>
     <param.email>daniel.smit@biomed.cas.cz</param.email>
     <param.company>Institute of Physiology, CAS</param.company>
     <param.icon />
     <param.icons />
-    <param.summary>A tool to analyse recording of BFP experiments. Performs tracking, force calculation and basic analysis.</param.summary>
-    <param.description>The application with an extensive GUI to track bead and pipette of a BFP experiment and calculate probe's force time course based on the tracking information. It allows to build a chain of incontiguous intervals of frames of the recording to avoid failing focus or footage without valid experimental material. The results can be exported and transfered to another machine. The tool contains Matlab ported documentation and extensive guidelining material.</param.description>
+    <param.summary>A tool to analyse recordings of BFP experiments. Performs tracking, force calculation and basic analysis.</param.summary>
+    <param.description>The application with an extensive GUI to track bead and pipette of a Biomembrane Force Probe (BFP) experiment and calculate probe's force time course based on the tracking information. The tracking is based on Matlab functions, but implements additional features to increase detection robustness and accuracy. It allows to build a chain of non-contiguous intervals of frames of the recording to avoid failing focus or footage without valid experimental material. Supplementary functions for basic fitting, in-video measurements and image quality analysis were integrated. The results can be exported and transferred to another machine. The tool contains Matlab ported searchable documentation and extensive guideline material.</param.description>
     <param.screenshot />
     <param.version>1.0</param.version>
     <param.products.name>
@@ -46,7 +46,6 @@
       <file>${PROJECT_ROOT}/TrackPipette.m</file>
       <file>${PROJECT_ROOT}/html/GUI.m</file>
       <file>${PROJECT_ROOT}/html/advanced.m</file>
-      <file>${PROJECT_ROOT}/html/application.m</file>
       <file>${PROJECT_ROOT}/html/basic.m</file>
       <file>${PROJECT_ROOT}/html/bfpmethods.m</file>
       <file>${PROJECT_ROOT}/html/computations.m</file>
@@ -69,7 +68,6 @@
       <file>${PROJECT_ROOT}/html/html/advanced_eq01333245096171706828.png</file>
       <file>${PROJECT_ROOT}/html/html/advanced_eq03442895190380135198.png</file>
       <file>${PROJECT_ROOT}/html/html/advanced_eq15636846968047188835.png</file>
-      <file>${PROJECT_ROOT}/html/html/application.html</file>
       <file>${PROJECT_ROOT}/html/html/basic.html</file>
       <file>${PROJECT_ROOT}/html/html/basicGUIconfirm.png</file>
       <file>${PROJECT_ROOT}/html/html/basicGUIforce.png</file>
@@ -79,17 +77,24 @@
       <file>${PROJECT_ROOT}/html/html/basic_eq12534472291285360343.png</file>
       <file>${PROJECT_ROOT}/html/html/basic_eq15636846968047188835.png</file>
       <file>${PROJECT_ROOT}/html/html/bfpmethods.html</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq00053564351058387201.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq09188988648859603407.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq09591123148565554844.png</file>
       <file>${PROJECT_ROOT}/html/html/bfpmethods_eq11892796486775896538.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq14098647778761276893.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq16063425794478178564.png</file>
       <file>${PROJECT_ROOT}/html/html/bfpmethods_eq16319215787732310329.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq17596684169846014741.png</file>
+      <file>${PROJECT_ROOT}/html/html/bfpmethods_eq18279636680200824075.png</file>
       <file>${PROJECT_ROOT}/html/html/computations.html</file>
       <file>${PROJECT_ROOT}/html/html/computations_eq03913420396963328117.png</file>
       <file>${PROJECT_ROOT}/html/html/computations_eq14817942261281681460.png</file>
       <file>${PROJECT_ROOT}/html/html/computations_eq15943080336943517084.png</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_1.cfe</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_1.cfs</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_1.si</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_2.cfe</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_2.cfs</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_2.si</file>
       <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments.gen</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments_2</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments_3</file>
       <file>${PROJECT_ROOT}/html/html/helptoc.xml</file>
       <file>${PROJECT_ROOT}/html/html/main.html</file>
       <file>${PROJECT_ROOT}/html/html/methods.html</file>

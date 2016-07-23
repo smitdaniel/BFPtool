@@ -1,7 +1,7 @@
 %% Advance guidelines
 % This file contains step-by-step instructions how to use specialised
 % features of the BFPTool to resolve difficulities in tracking and
-% introduces basic analysis and support tools incorporated. This text
+% introduces integrated analysis and support tools. This text
 % assumes the reader is familiar with the basics of the tool as illustrated
 % in the 
 % <./basic.html Basic guideline>
@@ -19,7 +19,7 @@
 % of intensity is calculated for each frame of the video and normalized to
 % have maximum of 1. This metric is called *SD2*. It is parsed, and
 % intervals of frames with *SD2* below 95% are reported. This can help user
-% to identify intervals, which would be difficult to track and exclude
+% to identify intervals, which would be difficult to track, and exclude
 % them. At the same time, running standard deviation of the *SD2* metric is
 % calculated, to account for contrast local variability, called *rSD2*; it is also normalised to maximum of 1.
 % Intervals of variable contrast are particularly difficult to track. User
@@ -28,15 +28,15 @@
 %
 % <<advancedCont.png>>
 % 
-% |Figure 1A,B: A --- SD2 contrast metric, intervals of metric < 95% are
-% labelled by blue line; B --- rSD2 metric, high peaks represent intervals
-% of high variability, which should be reviewed|
+% |Figure 1A,B: A: SD2 contrast metric, intervals of metric < 95% are
+% labelled by a blue line; B: rSD2 metric, high peaks represent intervals
+% of high variability, which should be reviewed. Note that rSD2 metric is not thresholded.|
 %
 % After revisions based on results from |figure 1|, we notice the video can
 % be tracked in intervals *(1,1100)*, *(1600,2000)* and *(2500,3000)*. We
 % can see that the focus is roughly the same in these intervals, therefore
 % we can track all three of them using the same *pipette pattern*. To share
-% a pattern across several intervals, we will use *Tracking list panel*.
+% a pattern across several intervals, we will use *Tracking list* panel.
 %
 %% Tracking list
 % # Click *Show tracking list panel* on the *Import, export, UI settings*  
@@ -71,7 +71,7 @@
 %
 % # On the *Set interval* tab, on the *Selected bead* line, click *List*
 % button (blue box in |Figure 3|). The bead currently selected in the drop-down list in *Bead
-% tracking* pane as selected for tracking in the interval.
+% tracking* pane is selected for tracking in the interval.
 % # On the line *Selected pattern* click *List* button (red box in |Figure 3|). The pipette pattern
 % is selected from the *Pipette patterns* pane list the same way.
 % # Click the *Show* button to see the pipette pattern with the *anchor*
@@ -84,12 +84,12 @@
 % (yellow box in |Figure 3|), type the last frame of the first interval,
 % *1100*.
 % # In the last edit field on the line *Interval* (brown box in |figure 3|), type the _index_
-% unstrained RBC reference frame. In our example, it is *81*.
+% of unstrained RBC reference frame. In our example, it is *81*.
 % # Click *Add to list* button, to add this interval to the list of
 % intervals. It is added without any modifications.
 % # You can review the interval information in the *List of intervals* tab
 % of the same pane. In the same tab, You can erase an interval by checking
-% its *Remove* box in the last collumn, and clicking the *Erase* button.
+% its *Remove* box in the last collumn, and clicking the *Erase* button (see |figure 4|).
 %
 % <<advancedInt.png>>
 %
@@ -104,9 +104,13 @@
 % *Set interval* pane (see 
 % <./basic.html Basic guideline>
 % ).
-% # Click *List* to add the same pipette pattern as in the first interval.
+% # Click *List* to add the same pipette pattern as in the first interval 
+% (make sure the same pipette pattern is selected in the drop-down menu of the *Pipette patterns* pane).
 % Note that using the same pattern with the same *anchor* makes results
-% from the two intervals fully compatible and comparable.
+% from the two intervals fully compatible and comparable. (Whenever identical 
+% pattern is detected in the interval list, the values
+% for the *anchor* and the *frame of reference* are automatically
+% retrieved.)
 % # Set the interval *(1600,2000)* in the line *Interval*, keep the
 % *anchor* *81*.
 % # Click *Add to list*. Program will display several dialog windows as it
@@ -124,18 +128,18 @@
 %
 % # Go to frame *1200* and use the same technique as in
 % <./basic.html Basic guideline> 
-% to set up an interval ending in frame *1400*.
+% to set up an interval ending by frame *1400*.
 % # If *reference distance frame* is not available in the interval, we can
 % try to arbitrarily select the first frame of the interval, *1200*, and
-% then, during analysis, try to shift the results, so they align with the values at the end of the
-% previous interval (note this can be doce, only if pipette and the bead
+% then, post-analysis, try to shift the results, so they align with the values at the end of the
+% previous interval (note this can be done, only if the pipette and the bead
 % do not change position during the focus transition).
 % # Add the interval to the list using *Add to list* button.
 %
 % In the tab *List of intervals*, we can see four added discontiguous
 % intervals, as shown in |Figure 4|. Note the *Erase* button marked by the
 % red box---clicking it erases intervals marked by checked boxes in the
-% last collumn (not in the field).
+% last collumn (not in the visible field).
 %
 % <<advancedIntList.png>>
 %
@@ -150,23 +154,23 @@
 % To obtain the calibrated, physical, results for *Force*, we need to
 % calibrate the probe---measure its geometrical features.
 %
-% # Click *Show experimental data panel* on the *Import,export and UI
+% # Click *Show experimental data panel* on the *Import, export and UI
 % settings* panel. The panel is displayed in the bottom right.
 % # Type in *Pixel to micron* ratio. This should be available at Your
 % experimental setup. If You miss this information, You can input an
 % estimate, by measuring a scale bar or a calibrated object in Your video.
-% Note that is You change the *Pixel to micron* ratio, You must *Update*
-% the computational object and re-track Your video.
+% Note that if You change the *Pixel to micron* ratio, You must *Update*
+% the computational _BFPClass_ object, re-track Your video and recalibrate the probe.
 % # In *Pressure* field, type in the aspiration pressure.
 % # Click *RBC radius* field. The pointer turns into a cross-hair. 
-% # Click inside the unotuched RBC (i.e. it is not in contact with the bead) and
-% click the button *Confirm*. The RBC is delineated; accept is detected
+% # Click inside the untouched RBC (i.e. it is not in contact with the bead) and
+% click the button *Confirm*. The RBC is delineated; accept if detected
 % properly, program updates the radius accordingly.
 % # Click *Pipette radius* button. Draw a line accross the inner diameter
 % of the pipette at the inner appex of the RBC and click *Confirm*. The
 % pipette radius is updated.
 % # Similarly, click the *Contact radius* button and measure the length of
-% the contact between the RBC and the bead, then confirm.
+% the contact between the RBC and the bead (in the *frame of reference distance*), then confirm.
 % 
 % All the parameters can be also typed directly in the appropriate edit
 % fields, if measured externally. These values allow the tool to calculate
@@ -175,7 +179,7 @@
 % defined intervals. In |Figure 5| can be seen the results, note the discontiguity
 % and the second interval shifted beacause of the arbibtrary reference 
 % distance selection. Also note the huge peak in the first interval, it
-% corresponds to rupture of the probe---the bead and pipette were still
+% corresponds to a rupture of the probe---the bead and pipette were still
 % tracked, but their mutual distance did not correspond to the RBC
 % distance, such intervals should be excluded from tracking and analysis. 
 % More details on the *Force* calculation and buttons *?* and *k* can be found in the
@@ -184,7 +188,8 @@
 %
 % <<advancedForce.png>>
 %
-% |Figure 5: calculated force time course|
+% |Figure 5: calculated force time course for 4 incontiguous intervals. The 
+% information about RBC deformation is present on the right y-axis.|
 %
 %% Plotting the results
 % The results can be plotted using the plotting interface on the panel
@@ -196,19 +201,20 @@
 % frame of requested interval to plot (note the first number must be
 % smaller than the second).
 % # Check boxes *Pipette* if You want plot data for the pipette and/or
-% *Bead* if You want to plot data for the bead. (Does not apply for *Force*
+% *Bead* if You want to plot data for the bead. (Does not apply to *Force*
 % and *Contrast*)
 % # From the drop-down menu, select the quantity You want to plot, of the
 % list *Force*, *Contrast*, *Metric* (i.e. detection strength metric),
 % *Tracks (3D)* and *Trajectories (2D)*.
-% # Click *Plot*, the quantity is plotted in the *Graph* area in the upper
+% # Click *Plot*, the quantity is plotted in the *Graph* area at the upper
 % right.
 %
 %% Basic Fitting tool
 % The panel *Basic Fitting* contains basic tools to fit a *Line*,
 % *Exponentiel* and detect *plateaux*.
 %
-% # Select interval to fit. Click *Choose interval* button and drag two
+% # Select interval to fit. Click *Choose interval* button in the *Basic fitting* 
+% panel and drag two
 % blue dots accross the graph to delimit the interval (see |Figure 6|).
 % # Click *Accept [X,X]*. The button will change to *Change [X,X]*,
 % allowing further changes of the interval. Buttons on the *Basic Fitting*
@@ -221,7 +227,7 @@
 %
 % * sensitivity to edges, higher number means higher tolerane to steps
 % * level of signal variance in the interval still considered a plateaux
-% * minimal length of a pleateau
+% * minimal length of a pleateau in frames
 %
 % <<advancedFit.png>>
 %
@@ -229,23 +235,23 @@
 %
 % <<advancedFitMontage.png>>
 %
-% |Figure 7: fitted line and plateaux detection; A: fitted lines with slope
+% |Figure 7: A: fitted lines with slope
 % parameters (force rate), B: fitted plateaux with average force|
 %
 %% Import, export and UI settings
 % There is a set of sources and targets for imports and exports. Not all
 % combinations are supported. You can choose the two locations from the two
-% drop-down menues and use the buttons *Export* and *Import* to transfer
+% drop-down menus and use the buttons *Export* and *Import* to transfer
 % data in the given direction. The individual locations are:
 %
 % *Internal data sources/targets*
 %
 % * force & tracks: data of tracked trajectories and calculated force in
 % form of columns of values
-% * frame: the currently displayed fram in *video player*
+% * frame: the currently displayed frame in *video player*
 % * graph: the current content of the *graph* area with the axes
-% * parameters: the whole current session exported into MAT file; can be
-% openned later or on another machine
+% * session: the whole current session exported into MAT file; can be
+% opened later or on another machine
 %
 % *External data sources/targets*
 %
@@ -255,13 +261,13 @@
 %
 % The same panel contains settings for the tool's GUI.
 %
-% * Verbose: when checked, more dialog windows are displayed, if unchecked,
-% the warnings are redirected to the command window
+% * Verbose output: when checked, more dialog windows are displayed, if unchecked,
+% the warnings are redirected to the command window.
 % * UI Fontsize: size of GUI font. Numbers above 1 are values in pixels,
 % number in the interval (0,1] are normalized font sizes. These may help to
 % tune the GUI to various screen sizes. Initially, all GUI items are
 % autoscaled to their _uicontrol_ objects.
-% * Show/hide toggles: allow to hide some of the panel, which are not always
+% * Show/hide toggles: allow to hide some of the panels, which are not always
 % necessary.
 %
 %% Detection settings
@@ -272,20 +278,26 @@
 % *Pipette*
 %
 % * Correlation thresh: level of correlation coefficient to initiate
-% corrective procedures trying to improve the detection. These are search in
-% less restricted area or attempts to dilate or erode the pattern. Note these
-% proedures cost considerable computational time and benefits are limited.
+% corrective procedures trying to improve the detection. The procedures can search in
+% less restricted area or attempt to dilate or erode the pattern. Note these
+% proedures cost considerable computational time and benefits might be limited.
 % * Contrast thresh: threshold to initiate routine checks if contrast drops.
 % * Buffer frames: number of allowed consecutive detection failures before the
 % tracking method aborts.
+% * Erode/Dilate: range of tested modifies patterns. The two edit fields
+% delimit a range, left number provides maximal erosion (removing boundary
+% pixels of the pattern), the right number maximal dilatation (add a layer
+% of boundary pixels). All pattern sizes between the two limits are tested
+% for the given frame and the best result is reported back. Note this can
+% be considerably computationally time consuming.
 %
 % *Bead*
 % 
-% * Range radius: search for beads with radii within this radius. The
+% * Range radius: search for beads with radii within this radius range. The
 % radius range can be calibrated by clicking the *Radius range* button,
 % clicking a bead in the frame and confirming. The bead is detected, if
 % user accepts, the radius range is modified based on the radius $R$ of the
-% detected bead (i.e. $(0.5R, 1.5R)$).
+% detected bead (i.e. the new radius range is then $(0.5R, 1.5R)$).
 % * Buffer frames: number of allowed consecutive detection failures before the
 % tracking method aborts.
 % * Sensitivity: sensitivity to possible circular objects.

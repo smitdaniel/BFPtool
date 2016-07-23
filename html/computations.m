@@ -1,5 +1,5 @@
 %% Computations
-% The tool consists of four major computational part. Two functions,
+% The tool consists of four major computational parts. Two functions,
 % _TrackBead_ and _TrackPipette_, and two classes, _BFPClass_ and
 % _vidWrap_. While these functions and classes are connected to the GUI,
 % they can be invoked also externally. The cornerstone is _BFPClass_ which
@@ -7,8 +7,7 @@
 % the tracking functions and maintains the returned data. _vidWrap_ is a
 % small class, which, to the biggest part, serves as a wrapper providing
 % common interface for Matlab natively supported video formats and TIFF
-% video format (supported through LibTIFF library). The code is generally
-% commented in detail.
+% video format (supported through LibTIFF library). The code is commented in detail.
 %
 %% vidWrap class
 % Major features of the class will be discussed in more detail. The class 
@@ -16,12 +15,12 @@
 % instance contains following varibles:
 %
 % # vidObj: is an object of the VideoReader class or Tiff class. Is is
-% called to subcontract class actions regarding video access.
-% # istiff: a bool indicating video's format (Tiff or not)
+% called to subcontract appropriate class actions regarding video access.
+% # istiff: a boolean indicating video's format (Tiff or not)
 % # videopath: full path to the video file
 % # video information: several fields containing video properties (Width,
 % Height, Duration, Frames, Framerate, Name, Format)
-% # CurrentFrame: currently accessed frame of the video
+% # CurrentFrame: currently open frame of the video
 % # contrast information: fields containing information about various
 % contrast measures for each frame, average intensity (GrayLvl), standard
 % deviation of intensity (Contrast)---often referred to as SD2, running
@@ -33,8 +32,14 @@
 %
 % Constructor takes full path of a video file as an input, and populates
 % most of the fields. It automatically determines if the file is Tiff or
-% not. For the Tiff files, framerate is set to 1. The class contains
-% following methods:
+% not. It attempts to read the _Framerate_ information from Tiff metadata
+% (for Matlab native format operated by _VideoReader_, this information is
+% readily available), if the information cannot be extracted, user is
+% prompted to provide the framerate. In case the detected framerate appears
+% incorrect, it can be changed in the GUI using the button *Reframerate* on
+% the *Video information* panel.
+%
+% The class contains the following methods:
 %
 % # [frame]=readFrame(index): reads next frame of the video, if optional (interger) input
 % _index_, the index of requested frame, is provided, the frame of that
@@ -42,17 +47,18 @@
 % # [db]=getFramerate(): (only for TIFF format) starts a temporary figure to 
 % prompt user for framerate of the open TIFF video. User can input either
 % duration of the video in seconds, or directly framerate in frames per
-% second. Returns handle to the dialog box.
+% second. Returns handle to the dialog box. Sets the provided parameters
+% within the calling object.
 % # [match]=matchVideos(vidWrap): compares current _vidWrap_ object with _vidWrap_
 % object passed as the argument. The method is a quick superficial
 % comparison, it compares format, width, height and number
 % of frames. If those match, objects are consedered as matching. This
-% method is used when a session is imported and user has to link
-% appropriate video manually. Seturns structure of matches for individual
+% method is used when a session is imported and user has to link an
+% appropriate video manually (if the paths don't agree). Seturns structure of matches for individual
 % categories.
 % # [contrast,meanGray]=getContrast(ffrm, lfrm; type, rVarWW): returns
 % array of contrast metric during the interval [ffrm:lfrm], of type _type_
-% (1==*SD2* or 2==*rSD2*). If contrast has not yet been calculated, it calculates
+% (1== *SD2* or 2== *rSD2*). If contrast has not yet been calculated, it calculates
 % all the three contrast metrics mentioned earlier (*SD2*, *rSD2*, *meanGray*);
 % *rSD2* is calculated with the sliding window width given by the parameter
 % _rVarWW_ (interger). Note that _type_ and _rVarWW_ are optinal parameters, passed as
@@ -68,22 +74,23 @@
 % selection is based on the _imfindcircles_ detection strength
 % (metric---Hough accummulator array value) corrected by magnitude of
 % displacement as compared to the previous frame (for displacements above 5
-% pixels in one frame step, the metric is gradually reduced)._TrackBead_ method
+% pixels in one frame step, the metric strength is gradually reduced). _TrackBead_ method
 % takes many optional inputs and parameters.
 %
 % *Inputs:*
 %
-% * vidObj  : object of _vidWrap_ class wrapping the video file 
-% * contrast: contrast of the bead, either 'dark' or 'bright' (string)
-% * inicoor : initial coordinate, [x,y] of the bead
+% * vidObj  : object of _vidWrap_ class wrapping the video file
+% * contrast: contrast polarity of the bead, either 'dark' or 'bright' (string)
+% * inicoor : initial coordinate, [x,y] of the bead in the first fram of
+% the tracked interval
 % * range   : the frame range to search for the bead;a pair of
 % intergers; '-1' means track accross the whole passed video; this is
 % _optional_ input, which defaults to '-1'
 %
-% parameters may be the following (passed as name,value pair):
+% parameters may be the following (passed as (name,value) pair):
 %
 % * radius  : range of radii of the bead; pair of intergers [r(1),r(2)],
-% r(1)>r(2), r(1)>0
+% r(1)<r(2), r(1)>=1 (radius in pixels)
 % * buffer  : number of frames of failed detection before aborting;
 % interger
 % * sensitivity : 1-sensitivity=threshold for scores of Hough accumulator
@@ -92,7 +99,7 @@
 % * edge    : edge threshold of the method, lower threshold considers more
 % pixels to be edge pixels eligible to vote for centre; value in interval [0,1]
 % * side    : half-side of a box shaped area around the last valid centre detection
-% to search for the bead in the following frame; integer
+% to search for the bead in the following frame; pair of integers [x,y]
 % * robustness  : bead metric threshold, before corrective measures are taken;
 % optimally in the range [0,2]
 % * imagequality: image contrast (SD2) relative threshold, before
@@ -119,8 +126,8 @@
 % and sub-areas in the video frame. Area of maximal correlation is fitted
 % by elliptical paraboloid to obtain the result with sub-pixel precition.
 % The exact coordinate of the pattern is returned as a coordinate of anchor
-% point, predefined within the pattern. If the correlation coefficient drop
-% below a (user)-specified threshold, the method can call corrective
+% point, predefined within the pattern. If the correlation coefficient
+% drops below a (user)-specified threshold, the method can call corrective
 % measures, like routine search in the whole field, or trying to
 % restrict/enlarge the pattern to obtain better results. This corrections
 % do not always improve detection performance and are computationally
@@ -151,6 +158,8 @@
 % interger
 % * waitbar : handle to figure of tracking progress bar started externally,
 % if any; figure handle
+% * dilate  : the range of tests using eroded/dilated pipette pattern; two
+% numeric values (max erosion/max dilatation) or 1 value (used for both)
 %
 % *Outputs:*
 %
@@ -165,7 +174,7 @@
 % constructor takes 3 arguments, *in the following order*:
 %
 % # name: the ID name of the object; string
-% # vidObj: _vidWrap_ class object, connecting the processed video file
+% # vidObj: _vidWrap_ class object, linking the processed video file
 % # intervallist: list of intervals to track; this structure contains not
 % only delimiting frame indices, but also pipette patterns, initical
 % coordinates, zero-load refrence distance frames etc. It provides the
@@ -174,7 +183,7 @@
 %
 % The class then provides several methods, which allow the object to import
 % other parameters (defining geometry of the probe and settings and thresholds
-% for the tracking methods). The methods will be discussed separately. To
+% for the tracking methods). The methods will be discussed on a separate docuentation page. To
 % give a quick non-technical summary, the class allows tracking,
 % calculation of RBC stiffness and force, has a plotting module (which
 % generates most of the GUI graphs), generates tracking fidelity reports,
@@ -193,8 +202,8 @@
 % * force: array of magnitude of force exerted through the BFP
 % * tracked: sets to _true_ when tracking is successfully finished in the
 % given interval
-% * trackedFrames: number of frames processed by the tracking method as of
-% now
+% * trackedFrames: number of frames processed by the tracking method at the
+% moment
 % * minFrame: minimal index of a tracked frame of the video
 % * maxFrame: maximal index of a tracked frame of the video
 % * toBeTracked: number of all frames to be processed, based on imported intervallist
