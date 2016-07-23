@@ -1,5 +1,5 @@
 <deployment-project plugin="plugin.apptool" plugin-version="1.0">
-  <configuration build-checksum="2235884506" file="/home/daniel/Documents/Tool/tool/BFPTool.prj" location="/home/daniel/Documents/Tool/tool" name="BFPTool" target="target.mlapps" target-name="Package App">
+  <configuration build-checksum="2380492147" file="/home/daniel/Documents/Tool/tool/BFPTool.prj" location="/home/daniel/Documents/Tool/tool" name="BFPTool" target="target.mlapps" target-name="Package App">
     <param.appname>BFPTool</param.appname>
     <param.authnamewatermark>Daniel Smit</param.authnamewatermark>
     <param.email>daniel.smit@biomed.cas.cz</param.email>
@@ -90,11 +90,11 @@
       <file>${PROJECT_ROOT}/html/html/computations_eq03913420396963328117.png</file>
       <file>${PROJECT_ROOT}/html/html/computations_eq14817942261281681460.png</file>
       <file>${PROJECT_ROOT}/html/html/computations_eq15943080336943517084.png</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_2.cfe</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_2.cfs</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_2.si</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_4.cfe</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_4.cfs</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/_4.si</file>
       <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments.gen</file>
-      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments_3</file>
+      <file>${PROJECT_ROOT}/html/html/helpsearch-v3/segments_5</file>
       <file>${PROJECT_ROOT}/html/html/helptoc.xml</file>
       <file>${PROJECT_ROOT}/html/html/main.html</file>
       <file>${PROJECT_ROOT}/html/html/methods.html</file>

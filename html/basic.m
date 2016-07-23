@@ -6,7 +6,7 @@
 %
 % <<basicGUIpic.png>>
 %
-% |Figure 1: Tool GUI after openning a video and running contrast analysis|
+% |Figure 1: Tool GUI after opening a video and running contrast analysis|
 %
 % The graph in the |figure 1| shows the time course of the video contrast in the *graph*.
 % It can be seen that the contrast is stable; we can assume there would be
@@ -31,7 +31,7 @@
 % measure (*SD2*) and local contrast measure variability (*rSD2*) using
 % radiobutton on panel *Tracking* (marked in cyan in |figure 1|).
 %
-% When openning a TIFF format file, a prompt dialog requests the user to
+% When opening a TIFF format file, a prompt dialog requests the user to
 % provide video framerate, if the information cannot be obtained from the
 % TIFF file itself. If the TIFF framerate information is loaded from the
 % metadata, but appears incorrect, user can change the framerate using the
@@ -42,13 +42,13 @@
 % necessary to exclude any frames, nor subdivide the tracking. Therefore, we only need to choose one
 % bead and one pipette pattern. The contrast information supports the image
 % stability assumption, but it is always a good practice to review both
-% contrast measures (*SD2* and *rSD2*) and inspect the video in suspisiosly looking intervals.
+% contrast measures (*SD2* and *rSD2*) and inspect the video in suspiciosly looking intervals.
 %
 %% Select tracked bead
 %
 % # Click *Select* button on the *Selected bead* line in the *Set interval*
 % panel (tab). The pointer turns into a cross-hair (on the video frame canvas).
-% # Click within the bead You want to track. You can repositon the blue 
+% # Click within the bead You want to track. You can reposition the blue 
 % cross-mark as necessary (it is highlighted by blue ring in |Figure 2|).
 % # Confirm the mark position by clicking the same button, now labelled 
 % *Confirm* (highlighted by the red box in |Figure 2|).
@@ -101,7 +101,7 @@
 % frame), the green box the *final frame* of the tracking interval.
 % # The yellow box in |Figure 3| indicates the _index_ of the frame, where the
 % RBC is unstrained (i.e. RBC and bead touch, but no load is applied). This
-% frame must be provided by user and can be soure of systematic error (i.e. all the
+% frame must be provided by user and can be source of systematic error (i.e. all the
 % deformation calculations can be shifted by a constant value).
 % # When the *pipette*, the *bead*, and the interval *key frames* (i.e. initial, 
 % final and reference frames) are selected, it can be added to the list of
@@ -113,7 +113,7 @@
 % (*frame of reference*), where the probe is under
 % no strain allows to measure reference distance of these two items. As the
 % distance between the two points changes during the experiment, we assume, the
-% deformation (extesion or compression) of RBC is equal to the change (this 
+% deformation (extension or compression) of RBC is equal to the change (this 
 % may not completely hold for experiments, where probe deviates from its axis).
 %
 %% Tracking and force calculation

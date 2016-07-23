@@ -12,7 +12,7 @@
 %% vidWrap class
 % Major features of the class will be discussed in more detail. The class 
 % is a child class of Matlab _handle_ class. The class
-% instance contains following varibles:
+% instance contains following variables:
 %
 % # vidObj: is an object of the VideoReader class or Tiff class. Is is
 % called to subcontract appropriate class actions regarding video access.
@@ -41,7 +41,7 @@
 %
 % The class contains the following methods:
 %
-% # [frame]=readFrame(index): reads next frame of the video, if optional (interger) input
+% # [frame]=readFrame(index): reads next frame of the video, if optional (integer) input
 % _index_, the index of requested frame, is provided, the frame of that
 % particular index is returned.
 % # [db]=getFramerate(): (only for TIFF format) starts a temporary figure to 
@@ -52,16 +52,16 @@
 % # [match]=matchVideos(vidWrap): compares current _vidWrap_ object with _vidWrap_
 % object passed as the argument. The method is a quick superficial
 % comparison, it compares format, width, height and number
-% of frames. If those match, objects are consedered as matching. This
+% of frames. If those match, objects are considered as matching. This
 % method is used when a session is imported and user has to link an
-% appropriate video manually (if the paths don't agree). Seturns structure of matches for individual
+% appropriate video manually (if the paths don't agree). Returns structure of matches for individual
 % categories.
 % # [contrast,meanGray]=getContrast(ffrm, lfrm; type, rVarWW): returns
 % array of contrast metric during the interval [ffrm:lfrm], of type _type_
 % (1== *SD2* or 2== *rSD2*). If contrast has not yet been calculated, it calculates
 % all the three contrast metrics mentioned earlier (*SD2*, *rSD2*, *meanGray*);
 % *rSD2* is calculated with the sliding window width given by the parameter
-% _rVarWW_ (interger). Note that _type_ and _rVarWW_ are optinal parameters, passed as
+% _rVarWW_ (integer). Note that _type_ and _rVarWW_ are optional parameters, passed as
 % a pair (e.g.: 'rVarWW',10). The default _type_ is *SD2*, the default
 % _rVarWW_ is object variable *rollVarWidth*.
 % # [contrastfrm]=getContrastByFrame(frm,type): returns value of contrast
@@ -72,7 +72,7 @@
 % _imfindcircles_ to track a bead. _imfindcircles_ uses Hough circular
 % transform, documentation is available in Matlab help. The final bead
 % selection is based on the _imfindcircles_ detection strength
-% (metric---Hough accummulator array value) corrected by magnitude of
+% (metric---Hough accumulator array value) corrected by magnitude of
 % displacement as compared to the previous frame (for displacements above 5
 % pixels in one frame step, the metric strength is gradually reduced). _TrackBead_ method
 % takes many optional inputs and parameters.
@@ -81,21 +81,21 @@
 %
 % * vidObj  : object of _vidWrap_ class wrapping the video file
 % * contrast: contrast polarity of the bead, either 'dark' or 'bright' (string)
-% * inicoor : initial coordinate, [x,y] of the bead in the first fram of
+% * inicoor : initial coordinate, [x,y] of the bead in the first frame of
 % the tracked interval
 % * range   : the frame range to search for the bead;a pair of
-% intergers; '-1' means track accross the whole passed video; this is
+% integers; '-1' means track across the whole passed video; this is
 % _optional_ input, which defaults to '-1'
 %
 % parameters may be the following (passed as (name,value) pair):
 %
-% * radius  : range of radii of the bead; pair of intergers [r(1),r(2)],
+% * radius  : range of radii of the bead; pair of integers [r(1),r(2)],
 % r(1)<r(2), r(1)>=1 (radius in pixels)
 % * buffer  : number of frames of failed detection before aborting;
-% interger
+% integer
 % * sensitivity : 1-sensitivity=threshold for scores of Hough accumulator
 % array to be considered a circle centre, the higher the sensitivity, the
-% weaked circles are detected; value in interval [0,1]
+% weaker circles are detected; value in interval [0,1]
 % * edge    : edge threshold of the method, lower threshold considers more
 % pixels to be edge pixels eligible to vote for centre; value in interval [0,1]
 % * side    : half-side of a box shaped area around the last valid centre detection
@@ -105,9 +105,9 @@
 % * imagequality: image contrast (SD2) relative threshold, before
 % corrective measures are taken; value in the range [0,1]
 % * review  : number of frames averaged to get info about metric and
-% contrast; interger
+% contrast; integer
 % * retries : max number of retries for one frame (w/ relaxed conditions);
-% interger
+% integer
 % * retry   : the flag stating that the call on this function is a retry 
 % from another _TrackBead_ instance; boolean
 % * waitbar : handle to figure of tracking progress bar started externally,
@@ -124,7 +124,7 @@
 % The method uses _normxcorr2_ normlized 2D cross correlation Matlab
 % function to calculate correlation between provided pipette tip pattern
 % and sub-areas in the video frame. Area of maximal correlation is fitted
-% by elliptical paraboloid to obtain the result with sub-pixel precition.
+% by elliptical paraboloid to obtain the result with sub-pixel precision.
 % The exact coordinate of the pattern is returned as a coordinate of anchor
 % point, predefined within the pattern. If the correlation coefficient
 % drops below a (user)-specified threshold, the method can call corrective
@@ -136,11 +136,11 @@
 % *Inputs:*
 %
 % * vidObj  : object of _vidWrap_ class wrapping the video file
-% * pipette : pattern of the pippete tip to be tracked (2D matrix, image)
+% * pipette : pattern of the pipette tip to be tracked (2D matrix, image)
 % * inicoor : initial coordinate to start the tracking; this is _optional_
 % input, which defaults to search in the whole initial frame
 % * range   : the range of frames to analyse in a video; a pair of
-% intergers; '-1' means track accross the whole passed video; this is
+% integers; '-1' means track across the whole passed video; this is
 % _optional_ input, which defaults to '-1'
 %
 % parameters may be following:
@@ -148,14 +148,14 @@
 % * review  : number of frames used for robustness analysis (retrospective
 % mean of correlation coefficients)
 % * robustness : threshold for poor correlation warnings and invocation of
-% corrective measures, larger value means stricted conditions and more
+% corrective measures, larger value means stricter conditions and more
 % corrective calls; a value in range [0,1]
 % * quality : threshold for poor contrast warnings, which can sometimes
 % lead to initiation of corrective measures; a value in range [0,1]
 % * wideField  : switch for unrestricted search in the whole field (full
 % frame); boolean
 % * buffer  : number of failed consecutive frame searches before aborting;
-% interger
+% integer
 % * waitbar : handle to figure of tracking progress bar started externally,
 % if any; figure handle
 % * dilate  : the range of tests using eroded/dilated pipette pattern; two
@@ -169,21 +169,21 @@
 %
 %% BFPClass
 % A control class for all BFPTool computations. It is a child class of
-% Matlab _handle_ class. Alle the fields of the class are public. It has
+% Matlab _handle_ class. All the fields of the class are public. It has
 % a default constructor, which takes no arguments. Otherwise, the
 % constructor takes 3 arguments, *in the following order*:
 %
 % # name: the ID name of the object; string
 % # vidObj: _vidWrap_ class object, linking the processed video file
 % # intervallist: list of intervals to track; this structure contains not
-% only delimiting frame indices, but also pipette patterns, initical
-% coordinates, zero-load refrence distance frames etc. It provides the
+% only delimiting frame indices, but also pipette patterns, initial
+% coordinates, zero-load reference distance frames etc. It provides the
 % object with all the information it needs to track the bead and the
-% pipette accross the video.
+% pipette across the video.
 %
 % The class then provides several methods, which allow the object to import
 % other parameters (defining geometry of the probe and settings and thresholds
-% for the tracking methods). The methods will be discussed on a separate docuentation page. To
+% for the tracking methods). The methods will be discussed on a separate documentation page. To
 % give a quick non-technical summary, the class allows tracking,
 % calculation of RBC stiffness and force, has a plotting module (which
 % generates most of the GUI graphs), generates tracking fidelity reports,
@@ -196,7 +196,7 @@
 %
 % * name: name of the experiment = name of the video file
 % * vidObj: _vidWrap_ class video object handle
-% * beadPositions: array of positions of the bead centre for all proecessed frames
+% * beadPositions: array of positions of the bead centre for all processed frames
 % * pipPositions: array positions of the pipette tip anchors for all processed
 % frames
 % * force: array of magnitude of force exerted through the BFP
@@ -216,7 +216,7 @@
 %
 % * Rg: radius of RBC
 % * Rc: radius of RBC-SB contact 
-% * Rp: radius of the pipette---inner radius at the inner RBC appex
+% * Rp: radius of the pipette---inner radius at the inner RBC apex
 % * P: pressure in the pipette---aspiration pressure
 % * P2M: scale of the video; pixels to microns (for our experiments generally 0.1024 um = 1 px)
 % * k: stiffness of the BFP

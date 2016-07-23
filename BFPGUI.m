@@ -659,8 +659,8 @@ set([handles.hvar,handles.htar,handles.hexport,handles.himport,handles.hverbose,
     % next function call, it all gets terribly messed up. Hope this settles
     % it. Collateral damage
     function deleteFigure_callback(~,~)
-        hfig.delete;
         backdoorObj.delete;
+        hfig.delete;
         evalin('base','clear ''all'' ');    % delete handles from the base
         clear handles;        
         clear hfig;

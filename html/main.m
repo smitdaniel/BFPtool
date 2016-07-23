@@ -12,7 +12,7 @@
 % # Video playback and tools
 % # Tracking and calculation settings
 % # Graphing and fitting tools
-% # Traking interval selection
+% # Tracking interval selection
 % # Import/export
 %
 % * Computations:
@@ -28,12 +28,12 @@
 % process data and performs organization of tasks 
 % * _TrackBead_ function responsible for tracking the selected bead in
 % a pre-defined interval
-% * _TrackPipette_ function reponsible for tracking the pipette tip pattern
+% * _TrackPipette_ function responsible for tracking the pipette tip pattern
 % in a pre-defined interval
 % * _vidWrap_ wrapper facilitating common interface for Matlab natively
 % supported video formats and TIFF format (which is supported through
 % LibTIFF library)
-% * _BackDoor_ is a servicing object allowing to change some variables of
+% * _BFPGUIbackdoor_ is a servicing object allowing to change some variables of
 % the program. It does not contain any essential code
 
 %% Installation and starting the tool
@@ -46,7 +46,7 @@
 % folder is added to the Matlab path (or set as a current Matlab path),
 % the tool can be run using command
 % *BFPGUI*. The command requires no inputs. Running the application creates
-% a _BackDoor_ class object. This object allows user to
+% a _BFPGUIbackdoor_ class object. This object allows user to
 % access tool's variables and functions, which are not
 % accessible otherwise (having mostly servicing function), note this object is 
 % created every time the app is started. 

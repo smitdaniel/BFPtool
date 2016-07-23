@@ -1,16 +1,16 @@
 %% Advance guidelines
 % This file contains step-by-step instructions how to use specialised
-% features of the BFPTool to resolve difficulities in tracking and
+% features of the BFPTool to resolve difficulties in tracking and
 % introduces integrated analysis and support tools. This text
 % assumes the reader is familiar with the basics of the tool as illustrated
 % in the 
 % <./basic.html Basic guideline>
 % .
 %
-% The first half of this guide treates features, which allow user to
-% construct a chain of incontiguous intervals to track, allowing her to
+% The first half of this guide treats features, which allow user to
+% construct a chain of non-contiguous intervals to track, allowing her to
 % avoid frames unsuitable for tracking (e.g. poor or variable contrast)
-% or frames, where tracking is not necesary (e.g. the probe is
+% or frames, where tracking is not necessary (e.g. the probe is
 % disconnected). In the second half, post-tracking processing is discussed.
 %
 %% Contrast analysis
@@ -89,7 +89,7 @@
 % intervals. It is added without any modifications.
 % # You can review the interval information in the *List of intervals* tab
 % of the same pane. In the same tab, You can erase an interval by checking
-% its *Remove* box in the last collumn, and clicking the *Erase* button (see |figure 4|).
+% its *Remove* box in the last column, and clicking the *Erase* button (see |figure 4|).
 %
 % <<advancedInt.png>>
 %
@@ -136,14 +136,14 @@
 % do not change position during the focus transition).
 % # Add the interval to the list using *Add to list* button.
 %
-% In the tab *List of intervals*, we can see four added discontiguous
+% In the tab *List of intervals*, we can see four added discontinuous
 % intervals, as shown in |Figure 4|. Note the *Erase* button marked by the
 % red box---clicking it erases intervals marked by checked boxes in the
-% last collumn (not in the visible field).
+% last column (not in the visible field).
 %
 % <<advancedIntList.png>>
 %
-% |Figure 4: list of selected intervals, the last collumn (not shown) has
+% |Figure 4: list of selected intervals, the last column (not shown) has
 % check boxes to select intervals for removal, erase button is marked in red|
 %
 % The list of intervals is tracked the same way as one-interval list in the
@@ -166,8 +166,8 @@
 % # Click inside the untouched RBC (i.e. it is not in contact with the bead) and
 % click the button *Confirm*. The RBC is delineated; accept if detected
 % properly, program updates the radius accordingly.
-% # Click *Pipette radius* button. Draw a line accross the inner diameter
-% of the pipette at the inner appex of the RBC and click *Confirm*. The
+% # Click *Pipette radius* button. Draw a line across the inner diameter
+% of the pipette at the inner apex of the RBC and click *Confirm*. The
 % pipette radius is updated.
 % # Similarly, click the *Contact radius* button and measure the length of
 % the contact between the RBC and the bead (in the *frame of reference distance*), then confirm.
@@ -176,8 +176,9 @@
 % fields, if measured externally. These values allow the tool to calculate
 % the stiffness $k$ of the particular probe. Clicking the *Get Force*
 % button on the *Tracking* panel calculates the $k$ and the *Force* for the
-% defined intervals. In |Figure 5| can be seen the results, note the discontiguity
-% and the second interval shifted beacause of the arbibtrary reference 
+% defined intervals. In |Figure 5| can be seen the results, note the
+% discontinuity
+% and the second interval shifted because of the arbitrary reference 
 % distance selection. Also note the huge peak in the first interval, it
 % corresponds to a rupture of the probe---the bead and pipette were still
 % tracked, but their mutual distance did not correspond to the RBC
@@ -188,7 +189,7 @@
 %
 % <<advancedForce.png>>
 %
-% |Figure 5: calculated force time course for 4 incontiguous intervals. The 
+% |Figure 5: calculated force time course for 4 non-contiguous intervals. The 
 % information about RBC deformation is present on the right y-axis.|
 %
 %% Plotting the results
@@ -211,23 +212,23 @@
 %
 %% Basic Fitting tool
 % The panel *Basic Fitting* contains basic tools to fit a *Line*,
-% *Exponentiel* and detect *plateaux*.
+% *Exponential* and detect *plateaux*.
 %
 % # Select interval to fit. Click *Choose interval* button in the *Basic fitting* 
 % panel and drag two
-% blue dots accross the graph to delimit the interval (see |Figure 6|).
+% blue dots across the graph to delimit the interval (see |Figure 6|).
 % # Click *Accept [X,X]*. The button will change to *Change [X,X]*,
 % allowing further changes of the interval. Buttons on the *Basic Fitting*
 % panel become enabled.
-% # Click *Fit line* or *Fit exponentiel* to fit the graph with
+% # Click *Fit line* or *Fit exponential* to fit the graph with
 % particular lines/curve (see |Figure 7A|).
 % # Click *Fit plateau* to detect plateaux in the graph (see |Figure 7B|).
 % # Click buttons *Sensitivity*, *Thresh* and *Length* to input settings
 % for plateaux detection, respectively:
 %
-% * sensitivity to edges, higher number means higher tolerane to steps
+% * sensitivity to edges, higher number means higher tolerance to steps
 % * level of signal variance in the interval still considered a plateaux
-% * minimal length of a pleateau in frames
+% * minimal length of a plateau in frames
 %
 % <<advancedFit.png>>
 %
@@ -280,7 +281,7 @@
 % * Correlation thresh: level of correlation coefficient to initiate
 % corrective procedures trying to improve the detection. The procedures can search in
 % less restricted area or attempt to dilate or erode the pattern. Note these
-% proedures cost considerable computational time and benefits might be limited.
+% procedures cost considerable computational time and benefits might be limited.
 % * Contrast thresh: threshold to initiate routine checks if contrast drops.
 % * Buffer frames: number of allowed consecutive detection failures before the
 % tracking method aborts.
@@ -309,7 +310,7 @@
 % * Metric thresh: threshold on the detection metric before other
 % thresholds are relaxed and search is retried.
 %
-% This concludes the full explanatou of the BFPTool GUI.
+% This concludes the full explanation of the BFPTool GUI.
 %
 
 

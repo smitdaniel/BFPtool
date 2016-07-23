@@ -67,7 +67,7 @@ if isempty(inp)     % create input parser
     addParameter(inp,'buffer',defaultBuffer,@(x) (isnumeric(x) && x > 0));
     addParameter(inp,'sensitivity',defaultSensitivity,@isnumeric);
     addParameter(inp,'edge',defaultEdge,@isnumeric);
-    addParameter(inp,'side',defaultSide,@(x) (isnumeric(x) && x > 0));
+    addParameter(inp,'side',defaultSide,@(x) (isnumeric(x) && all(x > 0)));
     addParameter(inp,'robustness',defaultRobustness,@isnumeric);
     addParameter(inp,'quality',defaultImageQuality,@isnumeric);
     addParameter(inp,'review',defaultReview,@isnumeric);

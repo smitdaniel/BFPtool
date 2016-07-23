@@ -8,7 +8,7 @@
 %
 % In the panel *Open a video*, user can either directly type full video
 % file path or click the *Browse* button and navigate to the file. Once the
-% file has been selected, it can be openned by clicking *Open*. The video
+% file has been selected, it can be opened by clicking *Open*. The video
 % will load and the first frame will be displayed in the video player.
 % Data will be populated in the *Video information* panel in the upper left
 % corner.
@@ -85,7 +85,7 @@
 % requested bead and confirming detects and delineates the bead (if
 % video quality allows detection). Similarly, clicking the *Select* button
 % on the line *Selected pattern* allows user to draw a delimiting rectangle
-% around the pipette tip to select the pattern to be matched accross the
+% around the pipette tip to select the pattern to be matched across the
 % defined time interval.
 % # A selection using lists in panels *Pipette pattern* and *Bead
 % tracking*. (_These panels are initially hidden, but can be displayed using
@@ -93,7 +93,7 @@
 % The pipette can be delineated clicking *Select* in *Pipette patterns*
 % panel--the pointer turns into cross-hair and user can draw a box around
 % the pipette tip and confirm by clicking the same button. The selection can
-% be saved in the list of patterns clicking the *Add* button. Currenly selected
+% be saved in the list of patterns clicking the *Add* button. Currently selected
 % item of the list (i.e. the displayed item of the drop-down menu)
 % can be removed clicking *Remove*. The bead can be added
 % to a respective list using analogical procedure. Clicking *Select* in the
@@ -102,8 +102,8 @@
 % using the *Add* button.
 %
 % The second explained method is useful for more complex trackings. For fragmented
-% videos, one may want to reuse the same pipette pattern accross several
-% incontiguous intervals, or recreate the interval list several times. Also
+% videos, one may want to reuse the same pipette pattern across several
+% non-contiguous intervals, or recreate the interval list several times. Also
 % note, that during the selection process, user is prompted to provide
 % supplementary information about the bead (i.e. dark/bright) and pipette
 % (i.e. select the anchor point).
@@ -126,12 +126,12 @@
 % correlation threshold of *0.8*, below which the program invokes some of 
 % the corrective procedures, regardless of the user-provided value.
 % The *Contrast thresh* is analogical, working with the
-% SD2 contrast (and corrective measures are less agressive). The *Buffer*
+% SD2 contrast (and corrective measures are less aggressive). The *Buffer*
 % represents the number of consecutive frames frames of failed detection, 
 % before the tracking is interrupted. *Erode/Dilate* edit fields allow to
 % input parameters for a corrective procedure. This procedure attempts to
 % detect also smaller (eroded) and larger (dilated) pattern in a sub-threshold frame, and returns the best
-% match. For poor correlations (arround 0.5), the improvement can be as high as 10%. The
+% match. For poor correlations (around 0.5), the improvement can be as high as 10%. The
 % edit fields set up a range of search, from maximal erosion in pixels on
 % the left by 1-pixel increments to the maximal dilatation in pixels on the
 % right (1-pixel erosion means the border pixels of the pattern
@@ -155,7 +155,7 @@
 % * Building an interval list
 %
 % The crucial feature of the tracking is setting up the list of
-% discontiguous intervals to track (if necessary). This technique allows to
+% discontinuous intervals to track (if necessary). This technique allows to
 % analyse only frames of interest and avoid video intervals of poor focus
 % or other problems. Intervals can be added to a list using the *Set
 % interval* tab. On the line *interval*, initial and final frames of the
@@ -163,7 +163,7 @@
 % in the frame (see point _Selecting a Bead and a Pipette pattern to
 % trak_) or loaded from the lists prepared in the panels *Pipette patterns* and *Bead
 % tracking*. If taken from the list, clicking the button *List* sets the
-% currently selected item of the respetive list (i.e the displayed in the 
+% currently selected item of the respective list (i.e the displayed in the 
 % drop-down menu). *Select* button on
 % *Pattern anchor* line allows user to specify pipette anchor---it is a
 % point of the pipette, the coordinates of which are returned as the
@@ -199,7 +199,7 @@
 % reconstructed by clicking the *Update* button. Clicking the button
 % *Track* invokes the tracking procedure of the _BFPClass_, which cycles
 % through the interval list and tracks the Bead and the Pipette
-% consecutivelly, according to the passed settings. It uses the contrast
+% consecutively, according to the passed settings. It uses the contrast
 % analysis (*Analyse contrast*) data, which are calculated at this point,
 % if not yet available. After the tracking is finished, report is generated,
 % showing the fidelity metrics of the bead and the pipette, marking
@@ -244,12 +244,12 @@
 % etc.). Note that it is always more precise to provide this value directly
 % based on the recording device information. The edit field *Pressure*
 % represents the difference of pressures in the experimental medium and the
-% pipette interious (i.e. the aspiration pressure), which has to be
+% pipette interiour (i.e. the aspiration pressure), which has to be
 % provided by the user. *RBC radius* button allows user to click inside the
 % RBC---after confirming the selection, the RBC is detected (if possible),
 % and its radius is measured automatically. Similarly, *Pipette radius*
-% allows user to draw a line accross the inner diameter of the pipette at
-% the internal RBC apex, the program then calculater the pipette radius
+% allows user to draw a line across the inner diameter of the pipette at
+% the internal RBC apex, the program then calculate the pipette radius
 % based on the line; analogically for the radius of contact between the RBC
 % and bead use the button *Contact radius*, and measure the radius in the
 % frame of reference distance (see above).
@@ -294,12 +294,12 @@
 % same button. The fitting procedures are invoked using the buttons above the 
 % interval selection button.
 % *Fit line* performs a linear fit through the data. If several data lines
-% are present (i.e. the graph is discontiguous), each section is fitted
+% are present (i.e. the graph is discontinuous), each section is fitted
 % separately. The coefficient is displayed in the graph and printed in the
-% command window. Similarly, the *Fit exponentiel* button has the same
-% behaviour, only fits an exponentiel curve. The last fitting function,
+% command window. Similarly, the *Fit exponential* button has the same
+% behaviour, only fits an exponential curve. The last fitting function,
 % *Fit plateau* scans the data and attempts to find and highlight the
-% pleateaux intervals. The conditions for plateaux are defined below.
+% plateaux intervals. The conditions for plateaux are defined below.
 % *Sensitivity* represents the width of the edge detection kernel (the
 % higher the sensitivity, the more data are considered plateau), *Thresh*
 % is the standard deviation threshold to consider an interval a plateau, and
@@ -307,10 +307,10 @@
 %
 %% Import/export
 % The panel *Import, export, UI settings* allows the user to show/hide some
-% of the panels (using the three labelle toggle buttons). The level 
+% of the panels (using the three labelled toggle buttons). The level 
 % of verbosity of the GUI can be changed using the checkbox *Verbose*, it
 % switches warning dialogs into command window warnings. The edit field titles
-% *UI Fontsize* allows user to set the global size of the font, to addapt
+% *UI Fontsize* allows user to set the global size of the font, to adapt
 % to GUI to various screen sizes. Values above 1 are interpreted as pixels
 % (note also that various systems interpret pixel font size differently),
 % below 1 is normalized to the size of UI object.
@@ -320,13 +320,5 @@
 % then show, what is ported where. Not all combinations are supported.
 % Major feature is to export/import *session*, which represent the current
 % session of the GUI, in form of MAT file. Other options are self-evident.
-
-
-
-
-
-
-
-
 
 

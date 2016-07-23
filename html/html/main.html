@@ -66,7 +66,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 
 
 
-  </style></head><body><div class="content"><h1>BFPTool GUI</h1><!--introduction--><p>BFPTool is a Matlab application allowing interactive analysis of recordings of experiments performed using Biomembrane Force Probe (BFP) technique. It implements a GUI and contains computational tools.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Composition</a></li><li><a href="#2">Installation and starting the tool</a></li></ul></div><h2>Composition<a name="1"></a></h2><p>The tool consists of the graphical user interface (GUI) and computational methods.</p><div><ul><li>GUI:</li></ul></div><div><ol><li>Video playback and tools</li><li>Tracking and calculation settings</li><li>Graphing and fitting tools</li><li>Traking interval selection</li><li>Import/export</li></ol></div><div><ul><li>Computations:</li></ul></div><div><ol><li>Bead tracking</li><li>Pipette matching</li><li>Supplementary functions</li></ol></div><p>The Tool code is composed of 5+1 M-files:</p><div><ul><li><i>BFPGUI</i> contains the whole GUI structure and GUI related functions</li><li><i>BFPClass</i> contains the crucial computational functions, stores process data and performs organization of tasks</li><li><i>TrackBead</i> function responsible for tracking the selected bead in a pre-defined interval</li><li><i>TrackPipette</i> function reponsible for tracking the pipette tip pattern in a pre-defined interval</li><li><i>vidWrap</i> wrapper facilitating common interface for Matlab natively supported video formats and TIFF format (which is supported through LibTIFF library)</li><li><i>BackDoor</i> is a servicing object allowing to change some variables of the program. It does not contain any essential code</li></ul></div><h2>Installation and starting the tool<a name="2"></a></h2><p>The tool can be installed as a Matlab application into the application dashbar. At the <b>Apps</b> tab, click the button <b>Install App</b> and navigate to the installation file. The application can then be started by clicking its icon on the application dashbar.</p><p>It can be also added as a folder of M-files. Once the path to the folder is added to the Matlab path (or set as a current Matlab path), the tool can be run using command <b>BFPGUI</b>. The command requires no inputs. Running the application creates a <i>BackDoor</i> class object. This object allows user to access tool's variables and functions, which are not accessible otherwise (having mostly servicing function), note this object is created every time the app is started.</p><p>When starting the tool from the command line, more options are available. The command takes one optional input: calling the BFPGUI with an argument BFPGUI(<i>saveddata.mat</i>), full path to a MAT file containing previously saved session <i>saveddata.mat</i>, restores the session from the file. Note that the video used through the saved session must be available.</p><p>The tool returns handle to the GUI figure, as recommended by Matlab documentation (the handle is not passed to the base workspace if started from the App dashbar).</p><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2015b</a><br></p></div><!--
+  </style></head><body><div class="content"><h1>BFPTool GUI</h1><!--introduction--><p>BFPTool is a Matlab application allowing interactive analysis of recordings of experiments performed using Biomembrane Force Probe (BFP) technique. It implements a GUI and contains computational tools.</p><!--/introduction--><h2>Contents</h2><div><ul><li><a href="#1">Composition</a></li><li><a href="#2">Installation and starting the tool</a></li></ul></div><h2>Composition<a name="1"></a></h2><p>The tool consists of the graphical user interface (GUI) and computational methods.</p><div><ul><li>GUI:</li></ul></div><div><ol><li>Video playback and tools</li><li>Tracking and calculation settings</li><li>Graphing and fitting tools</li><li>Tracking interval selection</li><li>Import/export</li></ol></div><div><ul><li>Computations:</li></ul></div><div><ol><li>Bead tracking</li><li>Pipette matching</li><li>Supplementary functions</li></ol></div><p>The Tool code is composed of 5+1 M-files:</p><div><ul><li><i>BFPGUI</i> contains the whole GUI structure and GUI related functions</li><li><i>BFPClass</i> contains the crucial computational functions, stores process data and performs organization of tasks</li><li><i>TrackBead</i> function responsible for tracking the selected bead in a pre-defined interval</li><li><i>TrackPipette</i> function responsible for tracking the pipette tip pattern in a pre-defined interval</li><li><i>vidWrap</i> wrapper facilitating common interface for Matlab natively supported video formats and TIFF format (which is supported through LibTIFF library)</li><li><i>BFPGUIbackdoor</i> is a servicing object allowing to change some variables of the program. It does not contain any essential code</li></ul></div><h2>Installation and starting the tool<a name="2"></a></h2><p>The tool can be installed as a Matlab application into the application dashbar. At the <b>Apps</b> tab, click the button <b>Install App</b> and navigate to the installation file. The application can then be started by clicking its icon on the application dashbar.</p><p>It can be also added as a folder of M-files. Once the path to the folder is added to the Matlab path (or set as a current Matlab path), the tool can be run using command <b>BFPGUI</b>. The command requires no inputs. Running the application creates a <i>BFPGUIbackdoor</i> class object. This object allows user to access tool's variables and functions, which are not accessible otherwise (having mostly servicing function), note this object is created every time the app is started.</p><p>When starting the tool from the command line, more options are available. The command takes one optional input: calling the BFPGUI with an argument BFPGUI(<i>saveddata.mat</i>), full path to a MAT file containing previously saved session <i>saveddata.mat</i>, restores the session from the file. Note that the video used through the saved session must be available.</p><p>The tool returns handle to the GUI figure, as recommended by Matlab documentation (the handle is not passed to the base workspace if started from the App dashbar).</p><p class="footer"><br><a href="http://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2015b</a><br></p></div><!--
 ##### SOURCE BEGIN #####
 %% BFPTool GUI
 % BFPTool is a Matlab application allowing interactive analysis of
@@ -82,7 +82,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % # Video playback and tools
 % # Tracking and calculation settings
 % # Graphing and fitting tools
-% # Traking interval selection
+% # Tracking interval selection
 % # Import/export
 %
 % * Computations:
@@ -98,12 +98,12 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % process data and performs organization of tasks 
 % * _TrackBead_ function responsible for tracking the selected bead in
 % a pre-defined interval
-% * _TrackPipette_ function reponsible for tracking the pipette tip pattern
+% * _TrackPipette_ function responsible for tracking the pipette tip pattern
 % in a pre-defined interval
 % * _vidWrap_ wrapper facilitating common interface for Matlab natively
 % supported video formats and TIFF format (which is supported through
 % LibTIFF library)
-% * _BackDoor_ is a servicing object allowing to change some variables of
+% * _BFPGUIbackdoor_ is a servicing object allowing to change some variables of
 % the program. It does not contain any essential code
 
 %% Installation and starting the tool
@@ -116,7 +116,7 @@ table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px soli
 % folder is added to the Matlab path (or set as a current Matlab path),
 % the tool can be run using command
 % *BFPGUI*. The command requires no inputs. Running the application creates
-% a _BackDoor_ class object. This object allows user to
+% a _BFPGUIbackdoor_ class object. This object allows user to
 % access tool's variables and functions, which are not
 % accessible otherwise (having mostly servicing function), note this object is 
 % created every time the app is started. 
