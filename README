@@ -1,6 +1,7 @@
 # BFPTool
 
 A Matlab based tool with GUI designed to process and analyse videos recorded during Biomembrane Force Probe (BFP) experiments. It allows post-experimental selective video processing, calculations and analysis of the results. Supplementary tools like import/export, visualizations and in-video measurements were implemented.
+The uderlying methods, implementation, and typical use are described in the article: Smit et al., BMC Biophysics 10:2 (2017), DOI: 10.1186/s13628-016-0033-2
 
 ## Getting Started
 
